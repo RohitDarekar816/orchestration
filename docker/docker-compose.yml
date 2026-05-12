@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=change-me-in-production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ../web:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: celery -A app.worker.scheduler.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=change-me-in-production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  beat:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: celery -A app.worker.scheduler.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=change-me-in-production
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=oz
+      - POSTGRES_PASSWORD=oz
+      - POSTGRES_DB=oz
+    expose:
+      - "5432"
+    volumes:
+      - oz_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  oz_pg_data:

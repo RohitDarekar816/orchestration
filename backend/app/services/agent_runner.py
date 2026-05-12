@@ -1,0 +1,286 @@
+import asyncio
+import json
+import os
+import tempfile
+import traceback
+import uuid
+from datetime import datetime, timezone
+from typing import Optional
+
+import docker
+from docker.types import Mount
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import get_settings
+from app.core.ws_manager import active_sessions
+from app.models.agent import AgentRun, AgentStatus
+from app.models.log import AgentLog
+
+settings = get_settings()
+
+
+class LocalAgentRunner:
+    """Runs agents on the local machine (for dev use)."""
+
+    def __init__(self, agent_run: AgentRun, db: AsyncSession):
+        self.agent_run = agent_run
+        self.db = db
+        self.process: Optional[asyncio.subprocess.Process] = None
+        self.work_dir = os.path.join(settings.agent_work_dir, str(agent_run.id))
+
+    def _get_command_and_input(self) -> tuple[list[str], Optional[str]]:
+        prompt = self.agent_run.prompt
+        agent = self.agent_run.agent_type
+
+        if agent == "opencode":
+            return ["opencode", "run", prompt or ""], None
+        elif agent == "claude-code":
+            return ["claude", "--print"], prompt
+        elif agent == "codex":
+            return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", prompt or ""], None
+        elif agent == "gemini-cli":
+            return ["gemini", "-p", prompt or ""], None
+        elif agent == "custom":
+            return [], prompt
+        return [], None
+
+    async def run(self):
+        os.makedirs(self.work_dir, exist_ok=True)
+        cmd, stdin_input = self._get_command_and_input()
+        if not cmd:
+            await self._log("error", "Unknown agent type or no command defined")
+            await self._update_status(AgentStatus.FAILED)
+            return
+
+        env = os.environ.copy()
+        if self.agent_run.env_vars:
+            try:
+                extra = json.loads(self.agent_run.env_vars)
+                env.update(extra)
+            except json.JSONDecodeError:
+                pass
+
+        await self._update_status(AgentStatus.RUNNING)
+
+        try:
+            stdin_pipe = asyncio.subprocess.PIPE if stdin_input is not None else asyncio.subprocess.DEVNULL
+            self.process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdin=stdin_pipe,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=self.work_dir,
+                env=env,
+            )
+
+            if stdin_input is not None:
+                self.process.stdin.write(stdin_input.encode())
+                await self.process.stdin.drain()
+                self.process.stdin.close()
+
+            async def _read_stream(stream, stream_name):
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+                    text = line.decode().rstrip("\n").rstrip("\r")
+                    if text:
+                        await self._log(stream_name, text)
+                        await self._broadcast(stream_name, text)
+
+            stdout_task = asyncio.create_task(_read_stream(self.process.stdout, "stdout"))
+            stderr_task = asyncio.create_task(_read_stream(self.process.stderr, "stderr"))
+
+            done, pending = await asyncio.wait(
+                {stdout_task, stderr_task},
+                timeout=self.agent_run.max_runtime,
+            )
+
+            for task in pending:
+                task.cancel()
+
+            exit_code = await self.process.wait()
+            self.agent_run.exit_code = exit_code
+            self.agent_run.finished_at = datetime.now(timezone.utc)
+            self.agent_run.status = AgentStatus.COMPLETED if exit_code == 0 else AgentStatus.FAILED
+            await self.db.commit()
+
+        except asyncio.TimeoutError:
+            if self.process:
+                self.process.kill()
+            await self._log("error", "Agent run timed out")
+            await self._update_status(AgentStatus.FAILED)
+        except Exception as e:
+            await self._log("error", f"{type(e).__name__}: {e}")
+            for line in traceback.format_exc().splitlines():
+                await self._log("error", line)
+            await self._update_status(AgentStatus.FAILED)
+
+    async def _update_status(self, status: AgentStatus):
+        self.agent_run.status = status
+        if status == AgentStatus.RUNNING:
+            self.agent_run.started_at = datetime.now(timezone.utc)
+        elif status in (AgentStatus.COMPLETED, AgentStatus.FAILED, AgentStatus.CANCELLED):
+            self.agent_run.finished_at = datetime.now(timezone.utc)
+        await self.db.commit()
+
+    async def _log(self, stream: str, content: str):
+        log = AgentLog(agent_run_id=self.agent_run.id, stream=stream, content=content)
+        self.db.add(log)
+        await self.db.commit()
+
+    async def _broadcast(self, stream: str, content: str):
+        ws = active_sessions.get(self.agent_run.id)
+        if ws:
+            try:
+                await ws.send_json({"stream": stream, "content": content, "timestamp": datetime.now(timezone.utc).isoformat()})
+            except Exception:
+                active_sessions.pop(self.agent_run.id, None)
+
+    async def cancel(self):
+        if self.process and self.process.returncode is None:
+            self.process.kill()
+            await self._update_status(AgentStatus.CANCELLED)
+
+    async def stream_logs(self):
+        result = await self.db.execute(
+            select(AgentLog)
+            .where(AgentLog.agent_run_id == self.agent_run.id)
+            .order_by(AgentLog.timestamp)
+        )
+        return result.scalars().all()
+
+
+class DockerAgentRunner:
+    """Runs agents in Docker containers (for production/server use)."""
+
+    def __init__(self, agent_run: AgentRun, db: AsyncSession):
+        self.agent_run = agent_run
+        self.db = db
+        self.container = None
+        self.client = docker.from_env()
+
+    async def run(self):
+        await self._update_status(AgentStatus.RUNNING)
+
+        env_vars = {}
+        if self.agent_run.env_vars:
+            try:
+                env_vars = json.loads(self.agent_run.env_vars)
+            except json.JSONDecodeError:
+                pass
+
+        cmd = self._build_cmd()
+        image = self.agent_run.image or "oz-agent:latest"
+
+        def _run_sync():
+            return self.client.containers.run(
+                image=image,
+                command=cmd,
+                environment=env_vars,
+                working_dir="/workspace",
+                tmpfs={"/workspace": "rw,noexec,nosuid,size=64m"},
+                detach=True,
+                network_mode="bridge",
+                mem_limit="4g",
+                cpu_period=100000,
+                cpu_quota=400000,
+            )
+
+        loop = asyncio.get_event_loop()
+        self.container = await loop.run_in_executor(None, _run_sync)
+
+        self.agent_run.container_id = self.container.id
+        await self.db.commit()
+
+        try:
+            result = await loop.run_in_executor(
+                None,
+                lambda: self.container.wait(timeout=self.agent_run.max_runtime),
+            )
+            exit_code = result["StatusCode"]
+
+            logs_raw = self.container.logs(stdout=True, stderr=True).decode()
+            for line in logs_raw.splitlines():
+                await self._log("stdout", line)
+
+            self.agent_run.exit_code = exit_code
+            self.agent_run.status = AgentStatus.COMPLETED if exit_code == 0 else AgentStatus.FAILED
+            self.agent_run.finished_at = datetime.now(timezone.utc)
+            await self.db.commit()
+
+        except Exception as e:
+            import traceback
+            await self._log("error", f"{type(e).__name__}: {e}")
+            for line in traceback.format_exc().splitlines():
+                await self._log("error", line)
+            self.agent_run.error = str(e)
+            await self._update_status(AgentStatus.FAILED)
+        finally:
+            def _cleanup():
+                if self.container:
+                    try:
+                        self.container.remove(force=True)
+                    except Exception:
+                        pass
+
+            await loop.run_in_executor(None, _cleanup)
+
+    def _build_cmd(self) -> str:
+        prompt = self.agent_run.prompt or ""
+        agent_type = self.agent_run.agent_type
+
+        if agent_type == "claude-code":
+            return f'claude --print << "EOF"\n{prompt}\nEOF'
+        elif agent_type == "codex":
+            escaped = prompt.replace('"', '\\"')
+            return f'codex exec --yolo --sandbox danger-full-access "{escaped}"'
+        elif agent_type == "opencode":
+            escaped = prompt.replace('"', '\\"')
+            return f'opencode --prompt "{escaped}"'
+        elif agent_type == "gemini-cli":
+            escaped = prompt.replace('"', '\\"')
+            return f'gemini -p "{escaped}"'
+        return prompt
+
+    async def _update_status(self, status: AgentStatus):
+        self.agent_run.status = status
+        if status == AgentStatus.RUNNING:
+            self.agent_run.started_at = datetime.now(timezone.utc)
+        elif status in (AgentStatus.COMPLETED, AgentStatus.FAILED, AgentStatus.CANCELLED):
+            self.agent_run.finished_at = datetime.now(timezone.utc)
+        await self.db.commit()
+
+    async def _log(self, stream: str, content: str):
+        log = AgentLog(agent_run_id=self.agent_run.id, stream=stream, content=content)
+        self.db.add(log)
+        await self.db.commit()
+        await self._broadcast(stream, content)
+
+    async def _broadcast(self, stream: str, content: str):
+        ws = active_sessions.get(self.agent_run.id)
+        if ws:
+            try:
+                await ws.send_json({"stream": stream, "content": content, "timestamp": datetime.now(timezone.utc).isoformat()})
+            except Exception:
+                active_sessions.pop(self.agent_run.id, None)
+
+    async def cancel(self):
+        if self.container:
+            def _kill():
+                try:
+                    self.container.kill()
+                    self.container.remove(force=True)
+                except Exception:
+                    pass
+
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, _kill)
+            await self._update_status(AgentStatus.CANCELLED)
+
+
+def get_runner(agent_run: AgentRun, db: AsyncSession):
+    if settings.oz_runner == "docker":
+        return DockerAgentRunner(agent_run, db)
+    return LocalAgentRunner(agent_run, db)
