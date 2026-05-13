@@ -404,7 +404,7 @@ Rules:
         thoughtTokensBudget: config.thoughtTokensBudget,
         disableThinking: true,
         tools: openAITools,
-        toolChoice: 'auto'
+        toolChoice: 'required'
       })
 
       if (!completionResult) {

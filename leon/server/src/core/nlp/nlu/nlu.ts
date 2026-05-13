@@ -1421,7 +1421,7 @@ export default class NLU {
                 }
 
                 await this.handleSkillOrActionNotFound()
-                return
+                return resolve(null)
               }
 
               const resolvedSkill = chosenSkill as string
@@ -1451,7 +1451,7 @@ export default class NLU {
                   }
                 }
 
-                return
+                return resolve({})
               }
             }
 

@@ -9,10 +9,14 @@
     "name": "Oz Team",
     "url": "https://opencode.ai"
   },
+  "action_notes": [
+    "For Docker, commands, system checks, monitoring, processes, disk, network → use run_bash",
+    "For complex tasks, automation, coding, troubleshooting, multi-step work → use launch_agent"
+  ],
   "actions": {
     "launch_agent": {
       "type": "logic",
-      "description": "Execute any user task by launching an AI agent. Handles ALL requests: system administration, running commands, checking servers, Docker containers, file operations, troubleshooting, automation, coding, data processing, and any other task the user needs done. Ask the user for details about what they want, then pass their request as the agent prompt.",
+      "description": "Launch an AI agent to handle complex tasks like automation, coding, troubleshooting, and multi-step workflows described in natural language.",
       "utterance_samples": [
         "check how many docker containers are running",
         "run docker ps on the server",
@@ -41,7 +45,7 @@
     },
     "run_bash": {
       "type": "logic",
-      "description": "Run a bash command directly on the server and return the output. Use this when the user asks to execute a specific shell command or check system information like Docker, processes, files, or disk usage.",
+      "description": "Run bash/server commands: Docker, processes, disk, network, files, system checks, monitoring, and any shell command.",
       "utterance_samples": [
         "run docker ps",
         "execute ls -la",
