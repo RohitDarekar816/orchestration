@@ -1,0 +1,57 @@
+{
+  "$schema": "../../../schemas/tool-schemas/tool.json",
+  "tool_id": "bash",
+  "toolkit_id": "operating_system_control",
+  "name": "Bash",
+  "description": "A tool for executing bash commands on the operating system.",
+  "icon_name": "terminal-line",
+  "author": {
+    "name": "Louis Grenard",
+    "email": "louis@getleon.ai",
+    "url": "https://twitter.com/grenlouis"
+  },
+  "functions": {
+    "executeBashCommand": {
+      "description": "Execute a bash command and return the result.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "number",
+                "description": "Command timeout. Use seconds by default. Large legacy values such as 30000 or 60000 are interpreted as milliseconds unless timeoutUnit is provided."
+              },
+              "timeoutUnit": {
+                "type": "string",
+                "enum": [
+                  "seconds",
+                  "milliseconds"
+                ],
+                "description": "Explicit unit for timeout. Use seconds for intentionally long tasks."
+              },
+              "timeoutRetries": {
+                "type": "number",
+                "description": "Number of timeout-only retries. Each retry doubles the previous timeout. Defaults to 2 and is capped internally."
+              },
+              "captureOutput": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    }
+  }
+}

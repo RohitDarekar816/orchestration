@@ -1,15 +1,16 @@
 from cryptography.fernet import Fernet
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.secret import Secret
 from app.core.config import get_settings
+from app.models.secret import Secret
 
 settings = get_settings()
 
 
 def _get_cipher():
     from base64 import urlsafe_b64encode
+
     if settings.debug:
         key = Fernet.generate_key()
     else:

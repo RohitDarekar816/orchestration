@@ -1,40 +1,40 @@
 import asyncio
 import json
-from typing import Optional
+from datetime import timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.user import User
-from app.services.skill_service import SkillService
-from app.services.audit_service import AuditService
+from app.core.database import get_db
 from app.models.agent import AgentRun, AgentStatus
+from app.models.user import User
+from app.services.audit_service import AuditService
+from app.services.skill_service import SkillService
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
 
 class SkillCreate(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     agent_type: str
-    system_prompt: Optional[str] = None
-    tools: Optional[list[str]] = None
-    env_template: Optional[dict] = None
-    image: Optional[str] = None
-    max_runtime: Optional[int] = None
+    system_prompt: str | None = None
+    tools: list[str] | None = None
+    env_template: dict | None = None
+    image: str | None = None
+    max_runtime: int | None = None
 
 
 class SkillUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    system_prompt: Optional[str] = None
-    tools: Optional[list[str]] = None
-    env_template: Optional[dict] = None
-    image: Optional[str] = None
-    max_runtime: Optional[int] = None
+    name: str | None = None
+    description: str | None = None
+    system_prompt: str | None = None
+    tools: list[str] | None = None
+    env_template: dict | None = None
+    image: str | None = None
+    max_runtime: int | None = None
 
 
 @router.get("")
@@ -174,9 +174,9 @@ async def delete_skill(
 
 
 class SkillExecuteRequest(BaseModel):
-    prompt: Optional[str] = None
-    target_repos: Optional[list[str]] = None
-    env_vars: Optional[dict] = None
+    prompt: str | None = None
+    target_repos: list[str] | None = None
+    env_vars: dict | None = None
 
 
 @router.post("/{skill_id}/execute")
@@ -194,7 +194,8 @@ async def execute_skill(
     prompt = await svc.render_prompt(skill, data.prompt or "")
     env_vars = data.env_vars or {}
     if skill.env_template:
-        skill_env = json.loads(skill.env_template) if isinstance(skill.env_template, str) else (skill.env_template or {})
+        raw = skill.env_template
+        skill_env = json.loads(raw) if isinstance(raw, str) else (raw or {})
         env_vars = {**skill_env, **env_vars}
 
     agent_run = AgentRun(
@@ -232,10 +233,12 @@ async def execute_skill(
 
 
 async def _run_skill_background(agent_id: int):
+
+    from sqlalchemy import select
+
     from app.core.database import async_session as new_session
     from app.services.agent_runner import get_runner
-    import traceback
-    from sqlalchemy import select
+
     try:
         async with new_session() as session:
             result = await session.execute(select(AgentRun).where(AgentRun.id == agent_id))
@@ -250,10 +253,11 @@ async def _run_skill_background(agent_id: int):
             if agent:
                 agent.status = AgentStatus.FAILED
                 agent.error = f"{type(e).__name__}: {e}"
-                from datetime import datetime, timezone
+                from datetime import datetime
+
                 agent.finished_at = datetime.now(timezone.utc)
                 await session.commit()
 
 
-def _dt(val) -> Optional[str]:
+def _dt(val) -> str | None:
     return val.isoformat() if val else None

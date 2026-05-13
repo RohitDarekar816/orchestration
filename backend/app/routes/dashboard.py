@@ -1,10 +1,11 @@
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends
-from app.core.database import get_db
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.auth import get_current_user
-from app.models.user import User
+from app.core.database import get_db
 from app.models.agent import AgentRun, AgentStatus
+from app.models.user import User
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -14,9 +15,7 @@ async def dashboard_stats(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    total = await db.scalar(
-        select(func.count(AgentRun.id)).where(AgentRun.user_id == user.id)
-    )
+    total = await db.scalar(select(func.count(AgentRun.id)).where(AgentRun.user_id == user.id))
     running = await db.scalar(
         select(func.count(AgentRun.id)).where(
             AgentRun.user_id == user.id,

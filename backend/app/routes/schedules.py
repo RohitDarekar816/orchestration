@@ -1,14 +1,12 @@
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
 from app.core.auth import get_current_user
+from app.core.database import get_db
 from app.models.user import User
-from app.services.scheduler_service import SchedulerService
 from app.services.audit_service import AuditService
+from app.services.scheduler_service import SchedulerService
 
 router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
@@ -17,9 +15,9 @@ class ScheduleCreate(BaseModel):
     name: str
     cron_expr: str
     agent_type: str
-    skill_id: Optional[int] = None
-    prompt_template: Optional[str] = None
-    target_repos: Optional[list[str]] = None
+    skill_id: int | None = None
+    prompt_template: str | None = None
+    target_repos: list[str] | None = None
 
 
 @router.get("")
@@ -61,7 +59,7 @@ async def create_schedule(
             target_repos=",".join(data.target_repos) if data.target_repos else None,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
     audit = AuditService(db)
     await audit.log(

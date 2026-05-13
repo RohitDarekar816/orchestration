@@ -1,7 +1,6 @@
 import json
-from typing import Optional
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.skill import Skill
@@ -12,12 +11,10 @@ class SkillService:
         self.db = db
 
     async def list_skills(self, user_id: int) -> list[Skill]:
-        result = await self.db.execute(
-            select(Skill).where(Skill.user_id == user_id).order_by(Skill.name)
-        )
+        result = await self.db.execute(select(Skill).where(Skill.user_id == user_id).order_by(Skill.name))
         return result.scalars().all()
 
-    async def get_skill(self, skill_id: int) -> Optional[Skill]:
+    async def get_skill(self, skill_id: int) -> Skill | None:
         result = await self.db.execute(select(Skill).where(Skill.id == skill_id))
         return result.scalar_one_or_none()
 
@@ -27,10 +24,10 @@ class SkillService:
         name: str,
         description: str,
         agent_type: str,
-        system_prompt: Optional[str] = None,
-        tools: Optional[list[str]] = None,
-        env_template: Optional[dict] = None,
-        image: Optional[str] = None,
+        system_prompt: str | None = None,
+        tools: list[str] | None = None,
+        env_template: dict | None = None,
+        image: str | None = None,
         max_runtime: int = 3600,
     ) -> Skill:
         skill = Skill(
@@ -49,7 +46,7 @@ class SkillService:
         await self.db.refresh(skill)
         return skill
 
-    async def update_skill(self, skill_id: int, **kwargs) -> Optional[Skill]:
+    async def update_skill(self, skill_id: int, **kwargs) -> Skill | None:
         skill = await self.get_skill(skill_id)
         if not skill:
             return None

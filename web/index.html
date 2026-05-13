@@ -4,41 +4,51 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Oz — Agent Orchestration</title>
+<script>
+  if (localStorage.getItem('oz_dark') === 'true' || (!localStorage.getItem('oz_dark') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+</script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class' };
+</script>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-  .agent-status-pending { @apply bg-yellow-100 text-yellow-800; }
-  .agent-status-running { @apply bg-blue-100 text-blue-800; }
-  .agent-status-completed { @apply bg-green-100 text-green-800; }
-  .agent-status-failed { @apply bg-red-100 text-red-800; }
-  .agent-status-cancelled { @apply bg-gray-100 text-gray-800; }
+  .agent-status-pending { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300; }
+  .agent-status-running { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300; }
+  .agent-status-completed { @apply bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300; }
+  .agent-status-failed { @apply bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300; }
+  .agent-status-cancelled { @apply bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300; }
 </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 dark:bg-gray-950">
   <div id="app" class="min-h-screen">
     <!-- Nav -->
-    <nav class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+    <nav class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <span class="text-2xl font-bold text-indigo-600">Oz</span>
-        <span class="text-sm text-gray-500">Agent Orchestration</span>
+        <span class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Oz</span>
+        <span class="text-sm text-gray-500 dark:text-gray-400">Agent Orchestration</span>
       </div>
       <div class="flex items-center gap-4">
+        <button id="dark-toggle" onclick="toggleDark()" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-lg leading-none" title="Toggle dark mode">&#9681;</button>
         <div id="auth-section">
-          <button onclick="openAuthModal()" class="text-sm text-indigo-600 hover:text-indigo-800">Sign In</button>
+          <button onclick="openAuthModal()" class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">Sign In</button>
         </div>
       </div>
     </nav>
 
     <div class="flex">
       <!-- Sidebar -->
-      <aside class="w-56 bg-white border-r border-gray-200 min-h-[calc(100vh-57px)] p-4 hidden md:block">
+      <aside class="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 min-h-[calc(100vh-57px)] p-4 hidden md:block">
         <nav class="space-y-1">
-          <a href="#" onclick="showPage('dashboard')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100 sidebar-link" data-page="dashboard">Dashboard</a>
-          <a href="#" onclick="showPage('agents')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100 sidebar-link" data-page="agents">Agent Runs</a>
-          <a href="#" onclick="showPage('launch')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100 sidebar-link" data-page="launch">Launch Agent</a>
-          <a href="#" onclick="showPage('skills')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100 sidebar-link" data-page="skills">Skills</a>
-          <a href="#" onclick="showPage('schedules')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100 sidebar-link" data-page="schedules">Schedules</a>
-          <a href="#" onclick="showPage('secrets')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 hover:bg-gray-100 sidebar-link" data-page="secrets">Secrets</a>
+          <a href="#" onclick="showPage('dashboard')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="dashboard">Dashboard</a>
+          <a href="#" onclick="showPage('agents')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="agents">Agent Runs</a>
+          <a href="#" onclick="showPage('launch')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="launch">Launch Agent</a>
+          <a href="#" onclick="showPage('skills')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="skills">Skills</a>
+          <a href="#" onclick="showPage('schedules')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="schedules">Schedules</a>
+          <a href="#" onclick="showPage('secrets')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="secrets">Secrets</a>
+          <a href="#" onclick="showPage('chat')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="chat">Chat</a>
         </nav>
       </aside>
 
@@ -49,43 +59,43 @@
     </div>
     <!-- Auth Modal -->
     <div id="auth-overlay" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden" onclick="event.stopPropagation()">
-        <div class="flex border-b border-gray-200">
-          <button class="auth-tab active flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 border-indigo-600 text-indigo-600" data-tab="login" onclick="showAuthTab('login')">Sign In</button>
-          <button class="auth-tab flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 border-transparent text-gray-500" data-tab="register" onclick="showAuthTab('register')">Register</button>
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl dark:shadow-2xl w-full max-w-md mx-4 overflow-hidden" onclick="event.stopPropagation()">
+        <div class="flex border-b border-gray-200 dark:border-gray-700">
+          <button class="auth-tab active flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 border-indigo-600 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400" data-tab="login" onclick="showAuthTab('login')">Sign In</button>
+          <button class="auth-tab flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 border-transparent text-gray-500 dark:text-gray-400" data-tab="register" onclick="showAuthTab('register')">Register</button>
         </div>
         <div class="p-6">
-          <div id="auth-error" class="hidden bg-red-50 text-red-600 text-sm px-3 py-2 rounded mb-4"></div>
+          <div id="auth-error" class="hidden bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm px-3 py-2 rounded mb-4"></div>
 
           <div id="login-form">
             <div class="mb-3">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input id="login-email" type="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="you@team.com">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+              <input id="login-email" type="email" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="you@team.com">
             </div>
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input id="login-password" type="password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Enter your password">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+              <input id="login-password" type="password" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="Enter your password">
             </div>
-            <button onclick="doLogin()" class="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Sign In</button>
+            <button onclick="doLogin()" class="w-full py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600">Sign In</button>
           </div>
 
           <div id="register-form" class="hidden">
             <div class="mb-3">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-              <input id="reg-name" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Your Name">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+              <input id="reg-name" type="text" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="Your Name">
             </div>
             <div class="mb-3">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input id="reg-email" type="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="you@team.com">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+              <input id="reg-email" type="email" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="you@team.com">
             </div>
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input id="reg-password" type="password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Create a password">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+              <input id="reg-password" type="password" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" placeholder="Create a password">
             </div>
-            <button onclick="doRegister()" class="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Create Account</button>
+            <button onclick="doRegister()" class="w-full py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600">Create Account</button>
           </div>
 
-          <button onclick="closeAuthModal()" class="w-full mt-3 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+          <button onclick="closeAuthModal()" class="w-full mt-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">Cancel</button>
         </div>
       </div>
     </div>
@@ -98,6 +108,12 @@ let currentUser = null;
 
 // Initialize
 if (token) loadUser();
+
+function toggleDark() {
+  const html = document.documentElement;
+  const isDark = html.classList.toggle('dark');
+  localStorage.setItem('oz_dark', isDark);
+}
 
 // --- API helpers ---
 async function api(method, path, body) {
@@ -141,9 +157,12 @@ function showAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach(el => {
     el.classList.toggle('active', el.dataset.tab === tab);
     el.classList.toggle('border-indigo-600', el.dataset.tab === tab);
+    el.classList.toggle('dark:border-indigo-400', el.dataset.tab === tab);
     el.classList.toggle('text-indigo-600', el.dataset.tab === tab);
+    el.classList.toggle('dark:text-indigo-400', el.dataset.tab === tab);
     el.classList.toggle('border-transparent', el.dataset.tab !== tab);
     el.classList.toggle('text-gray-500', el.dataset.tab !== tab);
+    el.classList.toggle('dark:text-gray-400', el.dataset.tab !== tab);
   });
   document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
   document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
@@ -196,7 +215,6 @@ async function doRegister() {
     await api('POST', '/auth/register', {
       email, password, full_name: name,
     });
-    // Auto-login after register
     document.getElementById('login-email').value = email;
     document.getElementById('login-password').value = password;
     showAuthTab('login');
@@ -214,7 +232,6 @@ function logout() {
   render();
 }
 
-// Enter key support
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeAuthModal();
   if (e.key === 'Enter') {
@@ -233,6 +250,7 @@ function showPage(page) {
   if (activeWs) { activeWs.close(); activeWs = null; }
   document.querySelectorAll('.sidebar-link').forEach(el => {
     el.classList.toggle('bg-gray-100', el.dataset.page === page);
+    el.classList.toggle('dark:bg-gray-800', el.dataset.page === page);
     el.classList.toggle('font-semibold', el.dataset.page === page);
   });
   const pages = {
@@ -242,6 +260,7 @@ function showPage(page) {
     skills: renderSkills,
     schedules: renderSchedules,
     secrets: renderSecrets,
+    chat: renderChat,
   };
   (pages[page] || renderDashboard)();
 }
@@ -251,13 +270,13 @@ function render() {
   const authEl = document.getElementById('auth-section');
   if (currentUser) {
     authEl.innerHTML = `
-      <span class="text-sm text-gray-600">${currentUser.full_name}</span>
-      <button onclick="logout()" class="text-sm text-red-600 hover:text-red-800 ml-3">Sign Out</button>
+      <span class="text-sm text-gray-600 dark:text-gray-400">${currentUser.full_name}</span>
+      <button onclick="logout()" class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 ml-3">Sign Out</button>
     `;
   } else {
     authEl.innerHTML = `
-      <button onclick="openAuthModal('register')" class="text-sm text-gray-600 hover:text-gray-800 mr-3">Register</button>
-      <button onclick="openAuthModal('login')" class="text-sm text-indigo-600 hover:text-indigo-800">Sign In</button>
+      <button onclick="openAuthModal('register')" class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mr-3">Register</button>
+      <button onclick="openAuthModal('login')" class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">Sign In</button>
     `;
   }
   showPage('dashboard');
@@ -266,15 +285,15 @@ function render() {
 // --- Dashboard ---
 async function renderDashboard() {
   const el = document.getElementById('page-content');
-  el.innerHTML = '<div class="text-gray-500">Loading...</div>';
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
 
   if (!currentUser) {
     el.innerHTML = `<div class="text-center py-16">
-      <h2 class="text-2xl font-bold text-gray-700">Welcome to Oz</h2>
-      <p class="text-gray-500 mt-2">Sign in or create an account to manage your agent runs</p>
+      <h2 class="text-2xl font-bold text-gray-700 dark:text-gray-200">Welcome to Oz</h2>
+      <p class="text-gray-500 dark:text-gray-400 mt-2">Sign in or create an account to manage your agent runs</p>
       <div class="mt-4 flex items-center justify-center gap-3">
-        <button onclick="openAuthModal('login')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Sign In</button>
-        <button onclick="openAuthModal('register')" class="px-4 py-2 border border-indigo-600 text-indigo-600 rounded-lg">Register</button>
+        <button onclick="openAuthModal('login')" class="px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg">Sign In</button>
+        <button onclick="openAuthModal('register')" class="px-4 py-2 border border-indigo-600 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400 rounded-lg">Register</button>
       </div>
     </div>`;
     return;
@@ -285,46 +304,46 @@ async function renderDashboard() {
     const agents = await api('GET', '/agents?limit=10');
 
     el.innerHTML = `
-      <h1 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Dashboard</h1>
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <div class="text-sm text-gray-500">Total Runs</div>
-          <div class="text-3xl font-bold text-gray-900 mt-1">${stats.total}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+          <div class="text-sm text-gray-500 dark:text-gray-400">Total Runs</div>
+          <div class="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-1">${stats.total}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <div class="text-sm text-gray-500">Running</div>
-          <div class="text-3xl font-bold text-blue-600 mt-1">${stats.running}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+          <div class="text-sm text-gray-500 dark:text-gray-400">Running</div>
+          <div class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-1">${stats.running}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <div class="text-sm text-gray-500">Completed</div>
-          <div class="text-3xl font-bold text-green-600 mt-1">${stats.completed}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+          <div class="text-sm text-gray-500 dark:text-gray-400">Completed</div>
+          <div class="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">${stats.completed}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-5">
-          <div class="text-sm text-gray-500">Failed</div>
-          <div class="text-3xl font-bold text-red-600 mt-1">${stats.failed}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+          <div class="text-sm text-gray-500 dark:text-gray-400">Failed</div>
+          <div class="text-3xl font-bold text-red-600 dark:text-red-400 mt-1">${stats.failed}</div>
         </div>
       </div>
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">Recent Runs</h2>
-      ${agents.length === 0 ? '<p class="text-gray-500">No agent runs yet. <a href="#" onclick="showPage(\'launch\')" class="text-indigo-600">Launch one</a>.</p>' : ''}
-      ${agents.length > 0 ? `<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Recent Runs</h2>
+      ${agents.length === 0 ? '<p class="text-gray-500 dark:text-gray-400">No agent runs yet. <a href="#" onclick="showPage(\'launch\')" class="text-indigo-600 dark:text-indigo-400">Launch one</a>.</p>' : ''}
+      ${agents.length > 0 ? `<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-left">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-left">
             <tr>
-              <th class="px-4 py-3 font-medium text-gray-600">ID</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Agent</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Status</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Created</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Action</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">ID</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Agent</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Status</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Created</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Action</th>
             </tr>
           </thead>
           <tbody>
             ${agents.map(a => `
-              <tr class="border-t border-gray-100 hover:bg-gray-50">
-                <td class="px-4 py-3 font-mono">#${a.id}</td>
-                <td class="px-4 py-3">${a.agent_type}</td>
+              <tr class="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <td class="px-4 py-3 font-mono text-gray-900 dark:text-gray-100">#${a.id}</td>
+                <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${a.agent_type}</td>
                 <td class="px-4 py-3"><span class="inline-flex px-2 py-1 rounded-full text-xs font-medium agent-status-${a.status}">${a.status}</span></td>
-                <td class="px-4 py-3 text-gray-500">${new Date(a.created_at).toLocaleString()}</td>
-                <td class="px-4 py-3"><a href="#" onclick="showAgentDetail(${a.id})" class="text-indigo-600 hover:text-indigo-800">View</a></td>
+                <td class="px-4 py-3 text-gray-500 dark:text-gray-400">${new Date(a.created_at).toLocaleString()}</td>
+                <td class="px-4 py-3"><a href="#" onclick="showAgentDetail(${a.id})" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">View</a></td>
               </tr>
             `).join('')}
           </tbody>
@@ -332,43 +351,43 @@ async function renderDashboard() {
       </div>` : ''}
     `;
   } catch (e) {
-    el.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
   }
 }
 
 // --- Agents List ---
 async function renderAgents() {
   const el = document.getElementById('page-content');
-  if (!currentUser) { el.innerHTML = '<p class="text-gray-500">Sign in to view agents.</p>'; return; }
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to view agents.</p>'; return; }
 
-  el.innerHTML = '<div class="text-gray-500">Loading...</div>';
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
   try {
     const agents = await api('GET', '/agents');
     el.innerHTML = `
-      <h1 class="text-2xl font-bold text-gray-900 mb-6">Agent Runs</h1>
-      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Agent Runs</h1>
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-left">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-left">
             <tr>
-              <th class="px-4 py-3 font-medium text-gray-600">ID</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Agent</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Status</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Started</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Finished</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Actions</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">ID</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Agent</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Status</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Started</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Finished</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
             </tr>
           </thead>
           <tbody>
             ${agents.map(a => `
-              <tr class="border-t border-gray-100 hover:bg-gray-50">
-                <td class="px-4 py-3 font-mono">#${a.id}</td>
-                <td class="px-4 py-3">${a.agent_type}</td>
+              <tr class="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <td class="px-4 py-3 font-mono text-gray-900 dark:text-gray-100">#${a.id}</td>
+                <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${a.agent_type}</td>
                 <td class="px-4 py-3"><span class="inline-flex px-2 py-1 rounded-full text-xs font-medium agent-status-${a.status}">${a.status}</span></td>
-                <td class="px-4 py-3 text-gray-500">${a.started_at ? new Date(a.started_at).toLocaleString() : '-'}</td>
-                <td class="px-4 py-3 text-gray-500">${a.finished_at ? new Date(a.finished_at).toLocaleString() : '-'}</td>
+                <td class="px-4 py-3 text-gray-500 dark:text-gray-400">${a.started_at ? new Date(a.started_at).toLocaleString() : '-'}</td>
+                <td class="px-4 py-3 text-gray-500 dark:text-gray-400">${a.finished_at ? new Date(a.finished_at).toLocaleString() : '-'}</td>
                 <td class="px-4 py-3">
-                  <a href="#" onclick="showAgentDetail(${a.id})" class="text-indigo-600 hover:text-indigo-800 mr-3">View</a>
-                  ${a.status === 'running' ? `<a href="#" onclick="cancelAgent(${a.id})" class="text-red-600 hover:text-red-800">Cancel</a>` : ''}
+                  <a href="#" onclick="showAgentDetail(${a.id})" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 mr-3">View</a>
+                  ${a.status === 'running' ? `<a href="#" onclick="cancelAgent(${a.id})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">Cancel</a>` : ''}
                 </td>
               </tr>
             `).join('')}
@@ -377,7 +396,7 @@ async function renderAgents() {
       </div>
     `;
   } catch (e) {
-    el.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
   }
 }
 
@@ -387,44 +406,44 @@ let activeWs = null;
 async function showAgentDetail(id) {
   if (activeWs) { activeWs.close(); activeWs = null; }
   const el = document.getElementById('page-content');
-  el.innerHTML = '<div class="text-gray-500">Loading...</div>';
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
   try {
     const agent = await api('GET', `/agents/${id}`);
     const logs = await api('GET', `/agents/${id}/logs`);
     el.innerHTML = `
       <div class="flex items-center gap-3 mb-6">
-        <a href="#" onclick="showPage('agents')" class="text-gray-500 hover:text-gray-700">&larr; Back</a>
-        <h1 class="text-2xl font-bold text-gray-900">Agent Run #${agent.id}</h1>
+        <a href="#" onclick="showPage('agents')" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">&larr; Back</a>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Agent Run #${agent.id}</h1>
         <span class="inline-flex px-2 py-1 rounded-full text-xs font-medium agent-status-${agent.status}">${agent.status}</span>
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-          <div class="text-sm text-gray-500">Agent Type</div>
-          <div class="font-medium">${agent.agent_type}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+          <div class="text-sm text-gray-500 dark:text-gray-400">Agent Type</div>
+          <div class="font-medium text-gray-900 dark:text-gray-100">${agent.agent_type}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-          <div class="text-sm text-gray-500">Started</div>
-          <div class="font-medium">${agent.started_at ? new Date(agent.started_at).toLocaleString() : '-'}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+          <div class="text-sm text-gray-500 dark:text-gray-400">Started</div>
+          <div class="font-medium text-gray-900 dark:text-gray-100">${agent.started_at ? new Date(agent.started_at).toLocaleString() : '-'}</div>
         </div>
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-          <div class="text-sm text-gray-500">Exit Code</div>
-          <div class="font-medium">${agent.exit_code !== null ? agent.exit_code : '-'}</div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+          <div class="text-sm text-gray-500 dark:text-gray-400">Exit Code</div>
+          <div class="font-medium text-gray-900 dark:text-gray-100">${agent.exit_code !== null ? agent.exit_code : '-'}</div>
         </div>
       </div>
-      ${agent.prompt ? `<div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        <div class="text-sm text-gray-500 mb-2">Prompt</div>
-        <pre class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(agent.prompt)}</pre>
+      ${agent.prompt ? `<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-6">
+        <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">Prompt</div>
+        <pre class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${escapeHtml(agent.prompt)}</pre>
       </div>` : ''}
-      <div class="bg-white rounded-xl border border-gray-200">
-        <div class="px-4 py-3 border-b border-gray-100 font-medium text-gray-700">Logs</div>
-        <div id="log-container" class="p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed bg-gray-900 text-green-400 rounded-b-xl">
-          ${logs.length === 0 ? '<span id="log-placeholder" class="text-gray-500">Waiting for logs...</span>' : logs.map(l => `<div>${escapeHtml(l.content)}</div>`).join('')}
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 font-medium text-gray-700 dark:text-gray-300">Logs</div>
+        <div id="log-container" class="p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed bg-gray-900 dark:bg-black text-green-400 dark:text-green-400 rounded-b-xl">
+          ${logs.length === 0 ? '<span id="log-placeholder" class="text-gray-500 dark:text-gray-500">Waiting for logs...</span>' : logs.map(l => `<div>${escapeHtml(l.content)}</div>`).join('')}
         </div>
       </div>
     `;
     connectWs(id);
   } catch (e) {
-    el.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
   }
 }
 
@@ -445,7 +464,7 @@ function connectWs(agentId) {
         div.textContent = data.content;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
-      } catch { /* ignore non-JSON messages like pong */ }
+      } catch { /* ignore non-JSON messages */ }
     };
     ws.onclose = () => { if (activeWs === ws) activeWs = null; };
     ws.onerror = () => { if (activeWs === ws) activeWs = null; };
@@ -463,7 +482,7 @@ async function cancelAgent(id) {
 // --- Launch ---
 async function renderLaunch() {
   const el = document.getElementById('page-content');
-  if (!currentUser) { el.innerHTML = '<p class="text-gray-500">Sign in to launch agents.</p>'; return; }
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to launch agents.</p>'; return; }
   let skillOpts = '';
   try {
     const skills = await api('GET', '/skills');
@@ -472,11 +491,11 @@ async function renderLaunch() {
     }
   } catch {}
   el.innerHTML = `
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Launch Agent</h1>
-    <div class="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Launch Agent</h1>
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 max-w-2xl">
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Agent Type</label>
-        <select id="launch-agent-type" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Type</label>
+        <select id="launch-agent-type" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
           <option value="opencode">OpenCode</option>
           <option value="claude-code">Claude Code</option>
           <option value="codex">Codex CLI</option>
@@ -485,20 +504,20 @@ async function renderLaunch() {
         </select>
       </div>
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Skill (optional)</label>
-        <select id="launch-skill" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skill (optional)</label>
+        <select id="launch-skill" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
           ${skillOpts || '<option value="">No skills available</option>'}
         </select>
       </div>
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Prompt</label>
-        <textarea id="launch-prompt" rows="6" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" placeholder="Describe the task for the agent..."></textarea>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prompt</label>
+        <textarea id="launch-prompt" rows="6" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm font-mono" placeholder="Describe the task for the agent..."></textarea>
       </div>
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Max Runtime (seconds)</label>
-        <input id="launch-timeout" type="number" value="3600" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Max Runtime (seconds)</label>
+        <input id="launch-timeout" type="number" value="3600" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
       </div>
-      <button onclick="doLaunch()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">
+      <button onclick="doLaunch()" class="px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-600 text-sm font-medium">
         Launch Agent
       </button>
       <div id="launch-result" class="mt-4"></div>
@@ -518,64 +537,64 @@ async function doLaunch() {
       skill_id: skillId || undefined,
       max_runtime: parseInt(document.getElementById('launch-timeout').value) || 3600,
     });
-    el.innerHTML = `<div class="text-green-600">Agent launched! ID: <strong>${data.id}</strong> Status: ${data.status}</div>
-      <button onclick="showAgentDetail(${data.id})" class="mt-2 text-indigo-600 hover:text-indigo-800 text-sm">View Run</button>`;
+    el.innerHTML = `<div class="text-green-600 dark:text-green-400">Agent launched! ID: <strong>${data.id}</strong> Status: ${data.status}</div>
+      <button onclick="showAgentDetail(${data.id})" class="mt-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm">View Run</button>`;
   } catch (e) {
-    el.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
   }
 }
 
 // --- Skills ---
 async function renderSkills() {
   const el = document.getElementById('page-content');
-  if (!currentUser) { el.innerHTML = '<p class="text-gray-500">Sign in to view skills.</p>'; return; }
-  el.innerHTML = '<div class="text-gray-500">Loading...</div>';
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to view skills.</p>'; return; }
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
   try {
     const skills = await api('GET', '/skills');
     el.innerHTML = `
       <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Skills</h1>
-        <button onclick="showCreateSkill()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">+ New Skill</button>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Skills</h1>
+        <button onclick="showCreateSkill()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm">+ New Skill</button>
       </div>
       <div id="skill-form"></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        ${skills.length === 0 ? '<p class="text-gray-500 col-span-2">No skills defined.</p>' :
+        ${skills.length === 0 ? '<p class="text-gray-500 dark:text-gray-400 col-span-2">No skills defined.</p>' :
           skills.map(s => `
-            <div class="bg-white rounded-xl border border-gray-200 p-4">
-              <div class="font-medium text-gray-900">${s.name}</div>
-              <div class="text-sm text-gray-500 mt-1">${s.description || 'No description'}</div>
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+              <div class="font-medium text-gray-900 dark:text-gray-100">${s.name}</div>
+              <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">${s.description || 'No description'}</div>
               <div class="flex items-center gap-2 mt-3">
-                <span class="text-xs bg-gray-100 px-2 py-1 rounded">${s.agent_type}</span>
-                <span class="text-xs text-gray-400">v${s.version}</span>
-                <button onclick="runSkill(${s.id})" class="ml-auto text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">Run</button>
+                <span class="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded">${s.agent_type}</span>
+                <span class="text-xs text-gray-400 dark:text-gray-500">v${s.version}</span>
+                <button onclick="runSkill(${s.id})" class="ml-auto text-xs px-2 py-1 bg-indigo-600 dark:bg-indigo-500 text-white rounded hover:bg-indigo-700 dark:hover:bg-indigo-600">Run</button>
               </div>
             </div>
           `).join('')}
       </div>
     `;
   } catch (e) {
-    el.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
   }
 }
 
 function showCreateSkill() {
   const el = document.getElementById('skill-form');
   el.innerHTML = `
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-      <h3 class="font-medium mb-3">Create Skill</h3>
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+      <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create Skill</h3>
       <div class="grid grid-cols-2 gap-3 mb-3">
-        <div><input id="skill-name" placeholder="Skill name" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+        <div><input id="skill-name" placeholder="Skill name" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
         <div>
-          <select id="skill-agent" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+          <select id="skill-agent" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm">
             <option value="opencode">OpenCode</option>
             <option value="claude-code">Claude Code</option>
             <option value="codex">Codex CLI</option>
           </select>
         </div>
       </div>
-      <div class="mb-3"><textarea id="skill-desc" placeholder="Description" rows="2" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></textarea></div>
-      <div class="mb-3"><textarea id="skill-prompt" placeholder="System prompt" rows="4" class="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono"></textarea></div>
-      <button onclick="doCreateSkill()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">Save Skill</button>
+      <div class="mb-3"><textarea id="skill-desc" placeholder="Description" rows="2" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></textarea></div>
+      <div class="mb-3"><textarea id="skill-prompt" placeholder="System prompt" rows="4" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm font-mono"></textarea></div>
+      <button onclick="doCreateSkill()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm">Save Skill</button>
     </div>
   `;
 }
@@ -608,38 +627,38 @@ async function runSkill(skillId) {
 // --- Schedules ---
 async function renderSchedules() {
   const el = document.getElementById('page-content');
-  if (!currentUser) { el.innerHTML = '<p class="text-gray-500">Sign in to view schedules.</p>'; return; }
-  el.innerHTML = '<div class="text-gray-500">Loading...</div>';
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to view schedules.</p>'; return; }
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
   try {
     const schedules = await api('GET', '/schedules');
     el.innerHTML = `
       <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Schedules</h1>
-        <button onclick="showCreateSchedule()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">+ New Schedule</button>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Schedules</h1>
+        <button onclick="showCreateSchedule()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm">+ New Schedule</button>
       </div>
       <div id="schedule-form"></div>
-      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-left">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-left">
             <tr>
-              <th class="px-4 py-3 font-medium text-gray-600">Name</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Cron</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Agent</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Active</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Last Run</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Name</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Cron</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Agent</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Active</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Last Run</th>
             </tr>
           </thead>
           <tbody>
-            ${schedules.length === 0 ? '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">No schedules</td></tr>' :
+            ${schedules.length === 0 ? '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-500 dark:text-gray-400">No schedules</td></tr>' :
               schedules.map(s => `
-                <tr class="border-t border-gray-100">
-                  <td class="px-4 py-3 font-medium">${s.name}</td>
-                  <td class="px-4 py-3 font-mono">${s.cron_expr}</td>
-                  <td class="px-4 py-3">${s.agent_type}</td>
+                <tr class="border-t border-gray-100 dark:border-gray-700">
+                  <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">${s.name}</td>
+                  <td class="px-4 py-3 font-mono text-gray-900 dark:text-gray-100">${s.cron_expr}</td>
+                  <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${s.agent_type}</td>
                   <td class="px-4 py-3">
-                    <button onclick="toggleSchedule(${s.id}, ${!s.is_active})" class="px-2 py-1 rounded text-xs font-medium ${s.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">${s.is_active ? 'Active' : 'Inactive'}</button>
+                    <button onclick="toggleSchedule(${s.id}, ${!s.is_active})" class="px-2 py-1 rounded text-xs font-medium ${s.is_active ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}">${s.is_active ? 'Active' : 'Inactive'}</button>
                   </td>
-                  <td class="px-4 py-3 text-gray-500">${s.last_run_at ? new Date(s.last_run_at).toLocaleString() : 'Never'}</td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400">${s.last_run_at ? new Date(s.last_run_at).toLocaleString() : 'Never'}</td>
                 </tr>
               `).join('')}
           </tbody>
@@ -647,30 +666,30 @@ async function renderSchedules() {
       </div>
     `;
   } catch (e) {
-    el.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
   }
 }
 
 function showCreateSchedule() {
   const el = document.getElementById('schedule-form');
   el.innerHTML = `
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-      <h3 class="font-medium mb-3">Create Schedule</h3>
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+      <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Create Schedule</h3>
       <div class="grid grid-cols-2 gap-3 mb-3">
-        <div><input id="sched-name" placeholder="Schedule name" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
-        <div><input id="sched-cron" placeholder="Cron expression (e.g. 0 9 * * 1)" class="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono"></div>
+        <div><input id="sched-name" placeholder="Schedule name" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
+        <div><input id="sched-cron" placeholder="Cron expression (e.g. 0 9 * * 1)" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm font-mono"></div>
       </div>
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <select id="sched-agent" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+          <select id="sched-agent" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm">
             <option value="opencode">OpenCode</option>
             <option value="claude-code">Claude Code</option>
             <option value="codex">Codex CLI</option>
           </select>
         </div>
       </div>
-      <div class="mb-3"><textarea id="sched-prompt" placeholder="Prompt template" rows="3" class="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono"></textarea></div>
-      <button onclick="doCreateSchedule()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">Save Schedule</button>
+      <div class="mb-3"><textarea id="sched-prompt" placeholder="Prompt template" rows="3" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm font-mono"></textarea></div>
+      <button onclick="doCreateSchedule()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm">Save Schedule</button>
     </div>
   `;
 }
@@ -697,34 +716,34 @@ async function toggleSchedule(id, active) {
 // --- Secrets ---
 async function renderSecrets() {
   const el = document.getElementById('page-content');
-  if (!currentUser) { el.innerHTML = '<p class="text-gray-500">Sign in to manage secrets.</p>'; return; }
-  el.innerHTML = '<div class="text-gray-500">Loading...</div>';
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to manage secrets.</p>'; return; }
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
   try {
     const secrets = await api('GET', '/secrets');
     el.innerHTML = `
       <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Secrets</h1>
-        <button onclick="showCreateSecret()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">+ New Secret</button>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Secrets</h1>
+        <button onclick="showCreateSecret()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm">+ New Secret</button>
       </div>
       <div id="secret-form"></div>
-      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="bg-gray-50 text-left">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-left">
             <tr>
-              <th class="px-4 py-3 font-medium text-gray-600">Name</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Scope</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Created</th>
-              <th class="px-4 py-3 font-medium text-gray-600">Actions</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Name</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Scope</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Created</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${secrets.length === 0 ? '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">No secrets stored</td></tr>' :
+            ${secrets.length === 0 ? '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500 dark:text-gray-400">No secrets stored</td></tr>' :
               secrets.map(s => `
-                <tr class="border-t border-gray-100">
-                  <td class="px-4 py-3 font-medium">${s.name}</td>
-                  <td class="px-4 py-3">${s.scope}</td>
-                  <td class="px-4 py-3 text-gray-500">${new Date(s.created_at).toLocaleString()}</td>
-                  <td class="px-4 py-3"><button onclick="deleteSecret(${s.id})" class="text-red-600 hover:text-red-800 text-sm">Delete</button></td>
+                <tr class="border-t border-gray-100 dark:border-gray-700">
+                  <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">${s.name}</td>
+                  <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${s.scope}</td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400">${new Date(s.created_at).toLocaleString()}</td>
+                  <td class="px-4 py-3"><button onclick="deleteSecret(${s.id})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm">Delete</button></td>
                 </tr>
               `).join('')}
           </tbody>
@@ -732,20 +751,20 @@ async function renderSecrets() {
       </div>
     `;
   } catch (e) {
-    el.innerHTML = `<div class="text-red-500">Error: ${e.message}</div>`;
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
   }
 }
 
 function showCreateSecret() {
   const el = document.getElementById('secret-form');
   el.innerHTML = `
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-      <h3 class="font-medium mb-3">Add Secret</h3>
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+      <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">Add Secret</h3>
       <div class="grid grid-cols-2 gap-3 mb-3">
-        <div><input id="secret-name" placeholder="Secret name (e.g. GITHUB_TOKEN)" class="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono"></div>
-        <div><input id="secret-value" type="password" placeholder="Value" class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></div>
+        <div><input id="secret-name" placeholder="Secret name (e.g. GITHUB_TOKEN)" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm font-mono"></div>
+        <div><input id="secret-value" type="password" placeholder="Value" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
       </div>
-      <button onclick="doCreateSecret()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm">Save Secret</button>
+      <button onclick="doCreateSecret()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm">Save Secret</button>
     </div>
   `;
 }
@@ -766,6 +785,29 @@ async function deleteSecret(id) {
   if (!confirm('Delete this secret?')) return;
   await api('DELETE', `/secrets/${id}`);
   renderSecrets();
+}
+
+// --- Chat ---
+
+async function renderChat() {
+  const el = document.getElementById('page-content');
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to use chat.</p>'; return; }
+
+  const leonUrl = localStorage.getItem('oz_leon_url') || 'http://localhost:5366';
+
+  el.innerHTML = `
+    <div class="flex flex-col h-[calc(100vh-120px)]">
+      <div class="flex items-center justify-between mb-3 flex-shrink-0">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Chat — LEON</h1>
+        <div class="flex items-center gap-2">
+          <a href="${leonUrl}" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 underline">Open in new tab</a>
+        </div>
+      </div>
+      <div class="flex-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <iframe src="${leonUrl}" class="w-full h-full border-0" title="LEON Chat" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+      </div>
+    </div>
+  `;
 }
 
 // --- Utils ---

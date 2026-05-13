@@ -29,7 +29,5 @@ class AuditService:
         await self.db.commit()
 
     async def list_logs(self, limit: int = 100) -> list[AuditLog]:
-        result = await self.db.execute(
-            select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
-        )
+        result = await self.db.execute(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit))
         return result.scalars().all()

@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
-import app.models.user  # noqa: ensure User model is registered before relationship() resolves
 
 
 class Schedule(Base):

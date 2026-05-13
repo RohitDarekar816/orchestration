@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
-import app.models.user  # noqa: ensure User model is registered
 
 
 class Skill(Base):

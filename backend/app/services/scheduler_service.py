@@ -4,8 +4,8 @@ from croniter import croniter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.schedule import Schedule
 from app.models.agent import AgentRun, AgentStatus
+from app.models.schedule import Schedule
 
 
 class SchedulerService:
@@ -13,9 +13,7 @@ class SchedulerService:
         self.db = db
 
     async def list_schedules(self, user_id: int) -> list[Schedule]:
-        result = await self.db.execute(
-            select(Schedule).where(Schedule.user_id == user_id).order_by(Schedule.name)
-        )
+        result = await self.db.execute(select(Schedule).where(Schedule.user_id == user_id).order_by(Schedule.name))
         return result.scalars().all()
 
     async def create_schedule(
@@ -46,9 +44,7 @@ class SchedulerService:
         return schedule
 
     async def evaluate_schedules(self):
-        result = await self.db.execute(
-            select(Schedule).where(Schedule.is_active == True)
-        )
+        result = await self.db.execute(select(Schedule).where(Schedule.is_active))
         schedules = result.scalars().all()
         now = datetime.now(timezone.utc)
         triggered = []

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import init_db
-from app.routes import auth, agents, skills, schedules, secrets, dashboard
+from app.routes import agents, auth, chat, dashboard, schedules, secrets, skills
 
 settings = get_settings()
 
@@ -35,6 +35,7 @@ app.include_router(agents.router)
 app.include_router(skills.router)
 app.include_router(schedules.router)
 app.include_router(secrets.router)
+app.include_router(chat.router)
 app.include_router(dashboard.router)
 
 

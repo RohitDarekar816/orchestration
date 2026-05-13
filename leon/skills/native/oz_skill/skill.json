@@ -1,0 +1,30 @@
+{
+  "$schema": "../../../schemas/skill-schemas/skill.json",
+  "name": "Oz",
+  "icon_name": "terminal-line",
+  "bridge": "nodejs",
+  "version": "1.0.0",
+  "description": "Interact with the Oz agent orchestration platform.",
+  "author": {
+    "name": "Oz Team",
+    "url": "https://opencode.ai"
+  },
+  "actions": {
+    "launch_agent": {
+      "type": "logic",
+      "description": "Launch an AI coding agent to execute a task. Ask the user what they want the agent to do, then pass their request as the prompt."
+    },
+    "list_agents": {
+      "type": "logic",
+      "description": "List recent agent runs and their statuses."
+    },
+    "get_agent": {
+      "type": "logic",
+      "description": "Get details, status and output of a specific agent run."
+    },
+    "cancel_agent": {
+      "type": "logic",
+      "description": "Cancel a running agent."
+    }
+  }
+}

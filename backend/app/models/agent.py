@@ -1,9 +1,9 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum, Float, func
-from sqlalchemy.orm import relationship
-from app.core.database import Base
-import app.models.user  # noqa: ensure User model is registered
-import app.models.skill  # noqa: ensure Skill model is registered
 import enum
+
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import relationship
+
+from app.core.database import Base
 
 
 class AgentStatus(str, enum.Enum):

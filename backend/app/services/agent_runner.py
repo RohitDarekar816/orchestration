@@ -1,14 +1,10 @@
 import asyncio
 import json
 import os
-import tempfile
 import traceback
-import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 import docker
-from docker.types import Mount
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,10 +22,10 @@ class LocalAgentRunner:
     def __init__(self, agent_run: AgentRun, db: AsyncSession):
         self.agent_run = agent_run
         self.db = db
-        self.process: Optional[asyncio.subprocess.Process] = None
+        self.process: asyncio.subprocess.Process | None = None
         self.work_dir = os.path.join(settings.agent_work_dir, str(agent_run.id))
 
-    def _get_command_and_input(self) -> tuple[list[str], Optional[str]]:
+    def _get_command_and_input(self) -> tuple[list[str], str | None]:
         prompt = self.agent_run.prompt
         agent = self.agent_run.agent_type
 
@@ -106,7 +102,7 @@ class LocalAgentRunner:
             self.agent_run.status = AgentStatus.COMPLETED if exit_code == 0 else AgentStatus.FAILED
             await self.db.commit()
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             if self.process:
                 self.process.kill()
             await self._log("error", "Agent run timed out")
@@ -134,7 +130,8 @@ class LocalAgentRunner:
         ws = active_sessions.get(self.agent_run.id)
         if ws:
             try:
-                await ws.send_json({"stream": stream, "content": content, "timestamp": datetime.now(timezone.utc).isoformat()})
+                ts = datetime.now(timezone.utc).isoformat()
+                await ws.send_json({"stream": stream, "content": content, "timestamp": ts})
             except Exception:
                 active_sessions.pop(self.agent_run.id, None)
 
@@ -145,9 +142,7 @@ class LocalAgentRunner:
 
     async def stream_logs(self):
         result = await self.db.execute(
-            select(AgentLog)
-            .where(AgentLog.agent_run_id == self.agent_run.id)
-            .order_by(AgentLog.timestamp)
+            select(AgentLog).where(AgentLog.agent_run_id == self.agent_run.id).order_by(AgentLog.timestamp)
         )
         return result.scalars().all()
 
@@ -212,12 +207,14 @@ class DockerAgentRunner:
 
         except Exception as e:
             import traceback
+
             await self._log("error", f"{type(e).__name__}: {e}")
             for line in traceback.format_exc().splitlines():
                 await self._log("error", line)
             self.agent_run.error = str(e)
             await self._update_status(AgentStatus.FAILED)
         finally:
+
             def _cleanup():
                 if self.container:
                     try:
@@ -262,12 +259,14 @@ class DockerAgentRunner:
         ws = active_sessions.get(self.agent_run.id)
         if ws:
             try:
-                await ws.send_json({"stream": stream, "content": content, "timestamp": datetime.now(timezone.utc).isoformat()})
+                ts = datetime.now(timezone.utc).isoformat()
+                await ws.send_json({"stream": stream, "content": content, "timestamp": ts})
             except Exception:
                 active_sessions.pop(self.agent_run.id, None)
 
     async def cancel(self):
         if self.container:
+
             def _kill():
                 try:
                     self.container.kill()

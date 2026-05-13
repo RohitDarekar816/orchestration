@@ -1,0 +1,123 @@
+{
+  "$schema": "../../../schemas/skill-schemas/skill-locale-config.json",
+  "actions": {
+    "launch_agent": {
+      "answers": {
+        "launching": [
+          {
+            "text": "Launching an Oz agent to handle that. One moment...",
+            "speech": "Launching an Oz agent to handle that. One moment."
+          }
+        ],
+        "launched": [
+          {
+            "text": "Agent launched! ID <strong>#{{ agent_id }}</strong>. It's currently <strong>{{ status }}</strong>.",
+            "speech": "Agent launched! ID {{ agent_id }}. It's currently {{ status }}."
+          }
+        ],
+        "result": [
+          {
+            "text": "Here's what the agent found:<br><br><pre>{{ logs }}</pre>",
+            "speech": "Here's what the agent found."
+          }
+        ],
+        "error": [
+          {
+            "text": "Sorry, I couldn't launch the agent: {{ message }}",
+            "speech": "Sorry, I couldn't launch the agent."
+          }
+        ],
+        "no_prompt": [
+          {
+            "text": "What task would you like the agent to do? Please describe it.",
+            "speech": "What task would you like the agent to do? Please describe it."
+          }
+        ]
+      }
+    },
+    "list_agents": {
+      "answers": {
+        "listing": [
+          {
+            "text": "Let me check the recent agent runs...",
+            "speech": "Let me check the recent agent runs."
+          }
+        ],
+        "empty": [
+          {
+            "text": "No agent runs found.",
+            "speech": "No agent runs found."
+          }
+        ],
+        "list": [
+          {
+            "text": "Here are the recent runs:<br><br>{{ agents }}",
+            "speech": "Here are the recent runs."
+          }
+        ],
+        "error": [
+          {
+            "text": "Sorry, I couldn't fetch the agent list: {{ message }}",
+            "speech": "Sorry, I couldn't fetch the agent list."
+          }
+        ]
+      }
+    },
+    "get_agent": {
+      "answers": {
+        "fetching": [
+          {
+            "text": "Let me check on that agent run...",
+            "speech": "Let me check on that agent run."
+          }
+        ],
+        "not_found": [
+          {
+            "text": "Agent run #{{ agent_id }} was not found.",
+            "speech": "Agent run {{ agent_id }} was not found."
+          }
+        ],
+        "detail": [
+          {
+            "text": "Agent <strong>#{{ agent_id }}</strong><br>Type: {{ type }}<br>Status: <strong>{{ status }}</strong><br>Created: {{ created }}<br><br>{{ logs_block }}",
+            "speech": "Agent {{ agent_id }}. Type: {{ type }}. Status: {{ status }}."
+          }
+        ],
+        "error": [
+          {
+            "text": "Sorry, I couldn't fetch agent details: {{ message }}",
+            "speech": "Sorry, I couldn't fetch agent details."
+          }
+        ]
+      }
+    },
+    "cancel_agent": {
+      "answers": {
+        "cancelling": [
+          {
+            "text": "Cancelling agent run...",
+            "speech": "Cancelling agent run."
+          }
+        ],
+        "cancelled": [
+          {
+            "text": "Agent #{{ agent_id }} has been cancelled.",
+            "speech": "Agent {{ agent_id }} has been cancelled."
+          }
+        ],
+        "not_found": [
+          {
+            "text": "Agent #{{ agent_id }} was not found.",
+            "speech": "Agent {{ agent_id }} was not found."
+          }
+        ],
+        "error": [
+          {
+            "text": "Sorry, I couldn't cancel the agent: {{ message }}",
+            "speech": "Sorry, I couldn't cancel the agent."
+          }
+        ]
+      }
+    }
+  }
+}

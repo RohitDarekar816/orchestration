@@ -1,15 +1,10 @@
 """Celery worker for evaluating and triggering scheduled agent runs."""
 
 import asyncio
-from datetime import datetime, timezone
 
 from celery import Celery
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.database import async_session
-from app.services.scheduler_service import SchedulerService
-from app.services.agent_runner import get_runner
 
 settings = get_settings()
 
@@ -35,13 +30,25 @@ celery_app.conf.update(
 )
 
 
+def _run_async(coro):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
 @celery_app.task(name="evaluate_schedules")
 def evaluate_schedules():
-    """Called by a periodic beat to evaluate and trigger scheduled agents."""
-    asyncio.run(_evaluate())
+    _run_async(_evaluate())
 
 
 async def _evaluate():
+    from app.core.database import async_session
+    from app.services.agent_runner import get_runner
+    from app.services.scheduler_service import SchedulerService
+
     async with async_session() as db:
         svc = SchedulerService(db)
         triggered = await svc.evaluate_schedules()
@@ -53,13 +60,15 @@ async def _evaluate():
 
 @celery_app.task(name="run_agent")
 def run_agent(agent_run_id: int):
-    """Run a specific agent by ID."""
-    asyncio.run(_run_single(agent_run_id))
+    _run_async(_run_single(agent_run_id))
 
 
 async def _run_single(agent_run_id: int):
     from sqlalchemy import select
+
+    from app.core.database import async_session
     from app.models.agent import AgentRun
+    from app.services.agent_runner import get_runner
 
     async with async_session() as db:
         result = await db.execute(select(AgentRun).where(AgentRun.id == agent_run_id))

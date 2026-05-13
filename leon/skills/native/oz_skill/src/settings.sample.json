@@ -1,0 +1,8 @@
+{
+  "oz_api_url": "http://api:8000/api",
+  "oz_auth_token": "",
+  "oz_email": "admin@oz.local",
+  "oz_password": "",
+  "default_agent_type": "opencode",
+  "default_max_runtime": 300
+}

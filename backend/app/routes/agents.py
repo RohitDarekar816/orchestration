@@ -1,45 +1,44 @@
 import asyncio
 import datetime
 import json
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
 
-from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.user import User
+from app.core.database import get_db
+from app.core.ws_manager import active_sessions
 from app.models.agent import AgentRun, AgentStatus
 from app.models.log import AgentLog
+from app.models.user import User
 from app.services.agent_runner import get_runner
 from app.services.audit_service import AuditService
 from app.services.skill_service import SkillService
-from app.core.ws_manager import active_sessions
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
 class AgentLaunchRequest(BaseModel):
     agent_type: str
-    prompt: Optional[str] = None
-    skill_id: Optional[int] = None
-    target_repos: Optional[list[str]] = None
-    env_vars: Optional[dict] = None
-    max_runtime: Optional[int] = None
+    prompt: str | None = None
+    skill_id: int | None = None
+    target_repos: list[str] | None = None
+    env_vars: dict | None = None
+    max_runtime: int | None = None
 
 
 class AgentResponse(BaseModel):
     id: int
     agent_type: str
     status: str
-    prompt: Optional[str]
-    container_id: Optional[str]
-    exit_code: Optional[int]
-    error: Optional[str]
-    started_at: Optional[str]
-    finished_at: Optional[str]
+    prompt: str | None
+    container_id: str | None
+    exit_code: int | None
+    error: str | None
+    started_at: str | None
+    finished_at: str | None
     created_at: str
 
 
@@ -62,7 +61,8 @@ async def launch_agent(
             raise HTTPException(status_code=404, detail="Skill not found")
         prompt = await svc.render_prompt(skill, prompt or "")
         if skill.env_template:
-            skill_env = json.loads(skill.env_template) if isinstance(skill.env_template, str) else (skill.env_template or {})
+            raw = skill.env_template
+            skill_env = json.loads(raw) if isinstance(raw, str) else (raw or {})
             env_vars = {**skill_env, **env_vars}
 
     agent_run = AgentRun(
@@ -100,7 +100,7 @@ async def launch_agent(
 
 @router.get("")
 async def list_agents(
-    status: Optional[str] = Query(None),
+    status: str | None = Query(None),
     limit: int = Query(50, le=200),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -132,9 +132,7 @@ async def get_agent(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id)
-    )
+    result = await db.execute(select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id))
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent run not found")
@@ -159,9 +157,7 @@ async def run_agent(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id)
-    )
+    result = await db.execute(select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id))
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent run not found")
@@ -177,9 +173,7 @@ async def cancel_agent(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id)
-    )
+    result = await db.execute(select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id))
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent run not found")
@@ -195,22 +189,18 @@ async def get_logs(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id)
-    )
+    result = await db.execute(select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Agent run not found")
 
     logs_result = await db.execute(
-        select(AgentLog)
-        .where(AgentLog.agent_run_id == agent_id)
-        .order_by(AgentLog.timestamp)
+        select(AgentLog).where(AgentLog.agent_run_id == agent_id).order_by(AgentLog.timestamp)
     )
     logs = logs_result.scalars().all()
 
     return [
-        {"stream": l.stream, "content": l.content, "timestamp": _dt(l.timestamp)}
-        for l in logs
+        {"stream": log_entry.stream, "content": log_entry.content, "timestamp": _dt(log_entry.timestamp)}
+        for log_entry in logs
     ]
 
 
@@ -223,7 +213,7 @@ async def agent_ws(websocket: WebSocket, agent_id: int):
         while True:
             try:
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=30)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             if data == "ping":
                 await websocket.send_text("pong")
@@ -234,32 +224,31 @@ async def agent_ws(websocket: WebSocket, agent_id: int):
 
 
 async def _run_agent_in_background(agent_id: int, _db: AsyncSession):
-    from app.core.database import async_session as new_session
     import traceback
+
+    from app.core.database import async_session as new_session
+
     try:
         async with new_session() as session:
-            result = await session.execute(
-                select(AgentRun).where(AgentRun.id == agent_id)
-            )
+            result = await session.execute(select(AgentRun).where(AgentRun.id == agent_id))
             agent = result.scalar_one_or_none()
             if agent:
                 runner = get_runner(agent, session)
                 await runner.run()
     except Exception as e:
         async with new_session() as session:
-            result = await session.execute(
-                select(AgentRun).where(AgentRun.id == agent_id)
-            )
+            result = await session.execute(select(AgentRun).where(AgentRun.id == agent_id))
             agent = result.scalar_one_or_none()
             if agent:
                 agent.status = AgentStatus.FAILED
                 agent.error = f"{type(e).__name__}: {e}"
-                agent.finished_at = datetime.datetime.now(datetime.timezone.utc)
+                agent.finished_at = datetime.datetime.now(datetime.UTC)
                 await session.commit()
-                log = AgentLog(agent_run_id=agent_id, stream="error", content=f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
+                err_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+                log = AgentLog(agent_run_id=agent_id, stream="error", content=err_msg)
                 session.add(log)
                 await session.commit()
 
 
-def _dt(val) -> Optional[str]:
+def _dt(val) -> str | None:
     return val.isoformat() if val else None

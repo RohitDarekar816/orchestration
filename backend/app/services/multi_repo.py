@@ -1,10 +1,8 @@
-import json
 import os
 import shutil
 import tempfile
-from typing import Optional
 
-from git import Repo, GitCommandError
+from git import GitCommandError, Repo
 
 
 class MultiRepoWorkspace:
