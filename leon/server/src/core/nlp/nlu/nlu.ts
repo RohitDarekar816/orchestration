@@ -238,7 +238,19 @@ export default class NLU {
       const skillResult = skillRouterResult?.output as unknown as string
 
       if (skillResult && skillResult !== 'None') {
-        return skillResult as NLPSkill
+        const registeredSkills = await SkillDomainHelper.listSkillFolders()
+        if (registeredSkills.includes(skillResult)) {
+          return skillResult as NLPSkill
+        }
+        LogHelper.warning(
+          `LLM hallucinated skill "${skillResult}" — not in registered skills`
+        )
+      }
+
+      const mode = this.resolveLeonMode()
+      if (mode === RoutingMode.Smart) {
+        LogHelper.info('No valid skill chosen; defaulting to oz_skill in Smart mode')
+        return 'oz_skill' as NLPSkill
       }
 
       return null

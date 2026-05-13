@@ -118,6 +118,40 @@
           }
         ]
       }
+    },
+    "run_bash": {
+      "answers": {
+        "executing": [
+          {
+            "text": "Launching an Oz agent to run that command. One moment...",
+            "speech": "Launching an Oz agent to run that command. One moment."
+          }
+        ],
+        "launched": [
+          {
+            "text": "Agent launched! ID <strong>#{{ agent_id }}</strong>. It's currently <strong>{{ status }}</strong>.",
+            "speech": "Agent launched! ID {{ agent_id }}. It's currently {{ status }}."
+          }
+        ],
+        "result": [
+          {
+            "text": "Here's the command output:<br><br><pre>{{ logs }}</pre>",
+            "speech": "Here's the command output."
+          }
+        ],
+        "error": [
+          {
+            "text": "Sorry, I couldn't run the command: {{ message }}",
+            "speech": "Sorry, I couldn't run the command."
+          }
+        ],
+        "no_command": [
+          {
+            "text": "What command would you like me to run?",
+            "speech": "What command would you like me to run?"
+          }
+        ]
+      }
     }
   }
 }

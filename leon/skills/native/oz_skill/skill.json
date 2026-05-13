@@ -4,7 +4,7 @@
   "icon_name": "terminal-line",
   "bridge": "nodejs",
   "version": "1.0.0",
-  "description": "Interact with the Oz agent orchestration platform.",
+  "description": "Oz platform launching AI agents for system tasks: Docker, commands, servers, monitoring, automation, troubleshooting, coding, file ops, and any other user requests.",
   "author": {
     "name": "Oz Team",
     "url": "https://opencode.ai"
@@ -12,19 +12,44 @@
   "actions": {
     "launch_agent": {
       "type": "logic",
-      "description": "Launch an AI coding agent to execute a task. Ask the user what they want the agent to do, then pass their request as the prompt."
+      "description": "Execute any user task by launching an AI agent. Handles ALL requests: system administration, running commands, checking servers, Docker containers, file operations, troubleshooting, automation, coding, data processing, and any other task the user needs done. Ask the user for details about what they want, then pass their request as the agent prompt.",
+      "utterance_samples": [
+        "check how many docker containers are running",
+        "run docker ps on the server",
+        "check the server status",
+        "list all running processes",
+        "check disk usage",
+        "tell me about the system",
+        "run a command for me",
+        "check what's happening on the server",
+        "how many containers are running",
+        "execute docker ps",
+        "show me docker container status"
+      ]
     },
     "list_agents": {
       "type": "logic",
-      "description": "List recent agent runs and their statuses."
+      "description": "List recent agent runs and their current status (completed, running, failed)."
     },
     "get_agent": {
       "type": "logic",
-      "description": "Get details, status and output of a specific agent run."
+      "description": "Get details, status and full output logs of a specific agent run by its ID."
     },
     "cancel_agent": {
       "type": "logic",
-      "description": "Cancel a running agent."
+      "description": "Cancel a currently running agent by its ID."
+    },
+    "run_bash": {
+      "type": "logic",
+      "description": "Run a bash command directly on the server and return the output. Use this when the user asks to execute a specific shell command or check system information like Docker, processes, files, or disk usage.",
+      "utterance_samples": [
+        "run docker ps",
+        "execute ls -la",
+        "check disk space with df -h",
+        "run docker ps -a",
+        "check memory with free -m",
+        "list running processes"
+      ]
     }
   }
 }
