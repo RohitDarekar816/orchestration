@@ -77,6 +77,7 @@ const LLM_PROVIDERS_MAP = {
   [LLMProviders.LlamaCPP]: 'llamacpp-llm-provider',
   [LLMProviders.SGLang]: 'sglang-llm-provider',
   [LLMProviders.Groq]: 'groq-llm-provider',
+  [LLMProviders.Gemini]: 'gemini-llm-provider',
   [LLMProviders.OpenRouter]: 'openrouter-llm-provider',
   [LLMProviders.ZAI]: 'z-ai-llm-provider',
   [LLMProviders.OpenAI]: 'openai-llm-provider',

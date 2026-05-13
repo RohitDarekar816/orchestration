@@ -236,10 +236,19 @@ export default class NLU {
       }
 
       const skillResult = skillRouterResult?.output as unknown as string
+      const sysKeywords = ['docker','container','server','bash','shell','ssh','process','deploy','systemctl','service','network','disk','memory','cpu','port','firewall','nginx','cron','journalctl','systemd','kernel','mount','fstab','iptables','ufw','apt','yum','dnf','pacman','pip','npm','node','python','java']
+      const utteranceLower = (typeof utterance === 'string' ? utterance : String(utterance)).toLowerCase()
+      const hasSysKeyword = sysKeywords.some(kw => utteranceLower.includes(kw))
 
       if (skillResult && skillResult !== 'None') {
         const registeredSkills = await SkillDomainHelper.listSkillFolders()
         if (registeredSkills.includes(skillResult)) {
+          if (hasSysKeyword && skillResult !== 'oz_skill') {
+            LogHelper.warning(
+              `LLM chose "${skillResult}" but query contains system keywords; forcing oz_skill`
+            )
+            return 'oz_skill' as NLPSkill
+          }
           return skillResult as NLPSkill
         }
         LogHelper.warning(

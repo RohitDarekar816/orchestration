@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv \
     git \
     ca-certificates \
+    docker.io \
+    openssh-client \
+    sshpass \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install uv --break-system-packages && rm -rf /root/.cache/pip
@@ -22,7 +25,7 @@ ENV GITHUB_ACTIONS=true
 ENV LEON_NODE_ENV=production
 ENV LEON_PYTHON_PATH=/usr/bin/python3
 ENV LEON_UV_PATH=/usr/local/bin/uv
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile && rm -rf /root/.local/share/pnpm/store /root/.cache /tmp/*
 
 EXPOSE 5366
 

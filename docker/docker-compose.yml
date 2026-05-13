@@ -9,6 +9,8 @@ services:
       - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=change-me-in-production
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db:
         condition: service_healthy
@@ -122,6 +124,7 @@ services:
       LEON_HTTP_API_KEY: dev-key-123
     volumes:
       - leon_profile:/root/.leon
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       llama-cpp:
         condition: service_healthy

@@ -51,6 +51,12 @@ export const LLM_PROVIDER_ACCOUNT_CONFIGS: ReadonlyArray<LLMProviderAccountConfi
       apiKeyURL: 'https://console.groq.com/keys'
     },
     {
+      label: 'Gemini',
+      value: LLMProviders.Gemini,
+      apiKeyEnv: 'LEON_GEMINI_API_KEY',
+      apiKeyURL: 'https://aistudio.google.com/apikey'
+    },
+    {
       label: 'Cerebras',
       value: LLMProviders.Cerebras,
       apiKeyEnv: 'LEON_CEREBRAS_API_KEY',

@@ -29,6 +29,7 @@ export enum LLMProviders {
   LlamaCPP = 'llamacpp',
   SGLang = 'sglang',
   Groq = 'groq',
+  Gemini = 'gemini',
   OpenRouter = 'openrouter',
   ZAI = 'zai',
   OpenAI = 'openai',
