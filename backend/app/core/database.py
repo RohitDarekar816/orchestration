@@ -24,3 +24,16 @@ async def get_db():
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    from sqlalchemy import select
+    from app.core.auth import hash_password
+    from app.models.user import User
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.email == "admin@oz.local"))
+        if not result.scalar_one_or_none():
+            session.add(User(
+                email="admin@oz.local",
+                hashed_password=hash_password("admin123"),
+                full_name="Admin",
+                role="admin",
+            ))
+            await session.commit()

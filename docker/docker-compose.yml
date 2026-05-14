@@ -126,14 +126,14 @@ services:
       LEON_PORT: "5366"
       LEON_HOST: http://0.0.0.0
       LEON_LANG: en-US
-      LEON_LLM: groq/llama-3.1-8b-instant
-      LEON_GROQ_API_KEY: ${GROQ_API_KEY}
+      LEON_LLM: openrouter/meta-llama/llama-3.1-8b-instruct
+      LEON_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       LEON_LLAMACPP_BASE_URL: http://llama-cpp:8080/v1
       LEON_OVER_HTTP: "true"
       LEON_WAKE_WORD: "false"
       LEON_STT: "false"
       LEON_TTS: "false"
-      LEON_ROUTING_MODE: smart
+      LEON_ROUTING_MODE: controlled
       LEON_AFTER_SPEECH: "false"
       LEON_TELEMETRY: "false"
       LEON_TIME_ZONE: UTC
@@ -146,6 +146,7 @@ services:
     volumes:
       - leon_profile:/root/.leon
       - /var/run/docker.sock:/var/run/docker.sock
+      - ../leon/skills/native/oz_skill:/app/leon/skills/native/oz_skill
     depends_on:
       llama-cpp:
         condition: service_healthy

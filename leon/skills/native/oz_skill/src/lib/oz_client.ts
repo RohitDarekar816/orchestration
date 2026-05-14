@@ -178,19 +178,48 @@ export async function resolveServerByName(
   network: Network
 ): Promise<ServerSummary | null> {
   if (!serverName) return null
-  try {
-    const res = await withRetry(() =>
-      network.request<ServerSummary[]>({
-        url: `${apiUrl}/servers`,
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    )
-    const servers = Array.isArray(res.data) ? res.data : []
-    return servers.find((s) => s.name.toLowerCase() === serverName.toLowerCase()) ?? null
-  } catch {
-    return null
+  const res = await withRetry(() =>
+    network.request<ServerSummary[]>({
+      url: `${apiUrl}/servers`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  )
+  const servers = Array.isArray(res.data) ? res.data : []
+  return servers.find((s) => s.name.toLowerCase() === serverName.toLowerCase()) ?? null
+}
+
+export async function fetchAllServers(
+  apiUrl: string,
+  token: string,
+  network: Network
+): Promise<ServerSummary[]> {
+  const res = await withRetry(() =>
+    network.request<ServerSummary[]>({
+      url: `${apiUrl}/servers`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  )
+  return Array.isArray(res.data) ? res.data : []
+}
+
+export async function findServerInUtterance(
+  utterance: string,
+  apiUrl: string,
+  token: string,
+  network: Network
+): Promise<ServerSummary | null> {
+  if (!utterance) return null
+  const servers = await fetchAllServers(apiUrl, token, network)
+  const lowerUtterance = utterance.toLowerCase()
+  for (const server of servers) {
+    const name = server.name.toLowerCase()
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`\\b${escaped}\\b`, 'i')
+    if (re.test(lowerUtterance)) return server
   }
+  return null
 }
 
 // ── Launch + poll ─────────────────────────────────────────────────────────────

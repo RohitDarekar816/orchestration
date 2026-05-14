@@ -105,6 +105,9 @@ class ServerService:
             f"- Port: {server.port}",
             f"- User: {server.username}",
             f"- Auth: {server.auth_type}",
+            "",
+            "SECURITY: NEVER print, log, or reveal the SSH password or private key value in your response. "
+            "Use the env vars below for authentication but never output their contents.",
         ]
 
         if server.auth_type == "key":

@@ -47,6 +47,7 @@
           <a href="#" onclick="showPage('launch')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="launch">Launch Agent</a>
           <a href="#" onclick="showPage('skills')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="skills">Skills</a>
           <a href="#" onclick="showPage('schedules')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="schedules">Schedules</a>
+          <a href="#" onclick="showPage('servers')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="servers">Servers</a>
           <a href="#" onclick="showPage('secrets')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="secrets">Secrets</a>
           <a href="#" onclick="showPage('chat')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="chat">Chat</a>
         </nav>
@@ -259,6 +260,7 @@ function showPage(page) {
     launch: renderLaunch,
     skills: renderSkills,
     schedules: renderSchedules,
+    servers: renderServers,
     secrets: renderSecrets,
     chat: renderChat,
   };
@@ -711,6 +713,226 @@ async function doCreateSchedule() {
 async function toggleSchedule(id, active) {
   await api('POST', `/schedules/${id}/toggle?active=${active}`);
   renderSchedules();
+}
+
+// --- Servers ---
+async function renderServers() {
+  const el = document.getElementById('page-content');
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to manage servers.</p>'; return; }
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
+  try {
+    const servers = await api('GET', '/servers');
+    const secrets = await api('GET', '/secrets');
+    el.innerHTML = `
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Servers</h1>
+        <button onclick="showCreateServer()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm">+ Add Server</button>
+      </div>
+      <div id="server-form"></div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-left">
+            <tr>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Name</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Host</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Port</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Username</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Auth</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Tags</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${servers.length === 0 ? '<tr><td colspan="7" class="px-4 py-6 text-center text-gray-500 dark:text-gray-400">No servers registered. Add one for Leon to deploy to.</td></tr>' :
+              servers.map(s => `
+                <tr class="border-t border-gray-100 dark:border-gray-700">
+                  <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">${escapeHtml(s.name)}</td>
+                  <td class="px-4 py-3 font-mono text-gray-900 dark:text-gray-100">${escapeHtml(s.host)}</td>
+                  <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${s.port}</td>
+                  <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${escapeHtml(s.username)}</td>
+                  <td class="px-4 py-3"><span class="inline-flex px-2 py-1 rounded text-xs font-medium ${s.auth_type === 'key' ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'}">${s.auth_type}</span></td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400">${s.tags && s.tags.length ? s.tags.map(t => '<span class="inline-block bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded text-xs mr-1">'+escapeHtml(t)+'</span>').join('') : '-'}</td>
+                  <td class="px-4 py-3">
+                    <button onclick="showEditServer(${s.id})" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm mr-3">Edit</button>
+                    <button onclick="deleteServer(${s.id})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm">Delete</button>
+                  </td>
+                </tr>
+              `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
+  }
+}
+
+function showCreateServer() {
+  renderServerForm(null);
+}
+
+async function showEditServer(id) {
+  try {
+    const server = await api('GET', `/servers/${id}`);
+    renderServerForm(server);
+  } catch (e) {
+    alert('Error loading server: ' + e.message);
+  }
+}
+
+async function renderServerForm(server) {
+  const el = document.getElementById('server-form');
+  const isEdit = !!server;
+  let secrets = [];
+  try { secrets = await api('GET', '/secrets'); } catch {}
+  function secretOpts(selectedId) {
+    let opts = '<option value="">None</option>';
+    for (const s of secrets) {
+      const sel = isEdit && selectedId === s.id ? ' selected' : '';
+      opts += `<option value="${s.id}"${sel}>${escapeHtml(s.name)}</option>`;
+    }
+    return opts;
+  }
+  const ki = isEdit ? server.ssh_key_secret_id : null;
+  const pi = isEdit ? server.ssh_password_secret_id : null;
+  el.innerHTML = `
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+      <h3 class="font-medium text-gray-900 dark:text-gray-100 mb-3">${isEdit ? 'Edit Server' : 'Add Server'}</h3>
+
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div><input id="sv-name" placeholder="Server name" value="${isEdit ? escapeHtml(server.name) : ''}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
+        <div><input id="sv-host" placeholder="Hostname or IP" value="${isEdit ? escapeHtml(server.host) : ''}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3 mb-3">
+        <div><input id="sv-port" type="number" placeholder="Port" value="${isEdit ? server.port : 22}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
+        <div><input id="sv-user" placeholder="Username" value="${isEdit ? escapeHtml(server.username) : ''}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
+        <div>
+          <select id="sv-auth" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm">
+            <option value="key" ${isEdit && server.auth_type === 'key' ? 'selected' : ''}>SSH Key</option>
+            <option value="password" ${isEdit && server.auth_type === 'password' ? 'selected' : ''}>Password</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="sv-auth-fields">
+        <div id="sv-key-fields" class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">SSH Key (paste or select existing)</label>
+            <textarea id="sv-key-value" rows="4" placeholder="Paste private key content..." class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm font-mono"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Or use existing secret</label>
+            <select id="sv-key-secret" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm">${secretOpts(ki)}</select>
+          </div>
+        </div>
+        <div id="sv-pass-fields" class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Password (enter or select existing)</label>
+            <input id="sv-pass-value" type="password" placeholder="Enter SSH password" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Or use existing secret</label>
+            <select id="sv-pass-secret" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm">${secretOpts(pi)}</select>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div><input id="sv-tags" placeholder="Tags (comma-separated)" value="${isEdit && server.tags ? server.tags.join(', ') : ''}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
+        <div><input id="sv-desc" placeholder="Description" value="${isEdit ? escapeHtml(server.description || '') : ''}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="${isEdit ? `doEditServer(${server.id})` : 'doCreateServer()'}" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm">${isEdit ? 'Update Server' : 'Save Server'}</button>
+        <button onclick="cancelServerForm()" class="px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm">Cancel</button>
+      </div>
+    </div>
+  `;
+  const authSelect = document.getElementById('sv-auth');
+  function toggleAuthFields() {
+    const isKey = authSelect.value === 'key';
+    document.getElementById('sv-key-fields').style.display = isKey ? 'grid' : 'none';
+    document.getElementById('sv-pass-fields').style.display = isKey ? 'none' : 'grid';
+  }
+  authSelect.onchange = toggleAuthFields;
+  toggleAuthFields();
+}
+
+function cancelServerForm() {
+  document.getElementById('server-form').innerHTML = '';
+}
+
+async function ensureSecret(name, value) {
+  if (!value) return null;
+  const secret = await api('POST', '/secrets', { name, value });
+  return secret.id;
+}
+
+async function gatherServerData() {
+  const tagsRaw = document.getElementById('sv-tags').value;
+  const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const authType = document.getElementById('sv-auth').value;
+  let sshKeySecretId = parseInt(document.getElementById('sv-key-secret').value) || null;
+  let sshPasswordSecretId = parseInt(document.getElementById('sv-pass-secret').value) || null;
+  if (authType === 'key') {
+    const keyValue = document.getElementById('sv-key-value').value;
+    if (keyValue) {
+      sshKeySecretId = await ensureSecret(
+        document.getElementById('sv-name').value + '_ssh_key',
+        keyValue
+      );
+    }
+  } else {
+    const passValue = document.getElementById('sv-pass-value').value;
+    if (passValue) {
+      sshPasswordSecretId = await ensureSecret(
+        document.getElementById('sv-name').value + '_ssh_pass',
+        passValue
+      );
+    }
+  }
+  return {
+    name: document.getElementById('sv-name').value,
+    host: document.getElementById('sv-host').value,
+    port: parseInt(document.getElementById('sv-port').value) || 22,
+    username: document.getElementById('sv-user').value,
+    auth_type: authType,
+    ssh_key_secret_id: sshKeySecretId,
+    ssh_password_secret_id: sshPasswordSecretId,
+    tags,
+    description: document.getElementById('sv-desc').value || null,
+  };
+}
+
+async function doCreateServer() {
+  try {
+    await api('POST', '/servers', await gatherServerData());
+    document.getElementById('server-form').innerHTML = '';
+    renderServers();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function doEditServer(id) {
+  try {
+    await api('PUT', `/servers/${id}`, await gatherServerData());
+    document.getElementById('server-form').innerHTML = '';
+    renderServers();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function deleteServer(id) {
+  if (!confirm('Delete this server?')) return;
+  try {
+    await api('DELETE', `/servers/${id}`);
+    renderServers();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 // --- Secrets ---

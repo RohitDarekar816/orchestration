@@ -278,8 +278,11 @@ class DockerAgentRunner:
             if settings.oz_opencode_model:
                 cmd += ["-m", settings.oz_opencode_model]
             preamble = (
-                "SSH RULE: When using sshpass, ALWAYS wrap the password in single quotes. "
-                "Correct form: sshpass -p 'PASSWORD' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 USER@HOST 'COMMAND'\n"
+                "OUTPUT RULE: You MUST NOT include, print, echo, or reveal any SSH credentials, passwords, private keys, "
+                "or secret values in your response. Use the env vars ($OZ_SSH_PASSWORD, $OZ_SSH_KEY) for authentication "
+                "but NEVER output their values.\n"
+                "SSH RULE: The SSH password is in the env var $OZ_SSH_PASSWORD (single-quote it for sshpass). "
+                "Correct form: sshpass -p '$OZ_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 USER@HOST 'COMMAND'\n"
                 "OUTPUT RULE: After completing the task, write ONE plain-English sentence summarising the result. "
                 "No markdown, no code blocks, no bullet points.\n\n"
             )

@@ -10,15 +10,16 @@
     "url": "https://opencode.ai"
   },
   "action_notes": [
-    "For greetings, social chat, or non-infrastructure questions → use greet",
-    "For quick bash/shell commands → use run_bash",
-    "For server CPU/memory/disk/service status → use server_health",
-    "For application or system log inspection → use app_logs",
-    "For Docker container logs and status → use docker_logs",
-    "For deploying a project (git pull, install, restart) → use deploy",
-    "For complex multi-step or open-ended tasks → use launch_agent",
-    "For listing registered servers → use list_servers",
-    "When a server name is mentioned, pass it as the server argument"
+    "CRITICAL: You MUST call the 'launch_agent' function for any infrastructure task that does not clearly match another action. NEVER return 'not_found'.",
+    "For greetings, social chat, or non-infrastructure questions → call greet",
+    "For quick bash/shell commands → call run_bash",
+    "For server CPU/memory/disk/service status → call server_health",
+    "For application or system log inspection → call app_logs",
+    "For Docker container logs and status → call docker_logs",
+    "For deploying a project (git pull, install, restart) → call deploy",
+    "For listing registered servers → call list_servers",
+    "When a server name is mentioned, pass it as the server argument",
+    "DEFAULT RULE: For any infrastructure/sysadmin/DevOps/server query where no other function clearly matches → call launch_agent"
   ],
   "actions": {
     "greet": {
@@ -41,6 +42,11 @@
     "run_bash": {
       "type": "logic",
       "description": "Run a bash or shell command on this machine or a named server. Use for quick one-shot commands: docker ps, df -h, free -m, ls, curl, etc.",
+      "parameters": {
+        "server": { "type": "string", "description": "Target server name to run the command on. Empty means local machine." },
+        "command": { "type": "string", "description": "The bash command to execute." }
+      },
+      "optional_parameters": ["server", "command"],
       "utterance_samples": [
         "run docker ps",
         "execute ls -la /var/www",
@@ -55,6 +61,10 @@
     "server_health": {
       "type": "logic",
       "description": "Check the health of a server: CPU, memory, disk, load average, failed services, and Docker container status.",
+      "parameters": {
+        "server": { "type": "string", "description": "Target server name to check health on. Empty means local machine." }
+      },
+      "optional_parameters": ["server"],
       "utterance_samples": [
         "check server health",
         "server health check on prod-web",
@@ -70,6 +80,13 @@
     "app_logs": {
       "type": "logic",
       "description": "Retrieve and inspect application or system logs from a server. Supports log file paths, service names, and keyword filtering.",
+      "parameters": {
+        "server": { "type": "string", "description": "Target server name to fetch logs from. Empty means local machine." },
+        "path": { "type": "string", "description": "Log file path or service name to inspect." },
+        "lines": { "type": "number", "description": "Number of log lines to fetch." },
+        "grep": { "type": "string", "description": "Keyword filter for log lines." }
+      },
+      "optional_parameters": ["server", "path", "lines", "grep"],
       "utterance_samples": [
         "show application logs",
         "fetch nginx error logs on prod-web",
@@ -84,6 +101,13 @@
     "docker_logs": {
       "type": "logic",
       "description": "Get Docker container logs and status. Can target a specific container or show all containers and their health.",
+      "parameters": {
+        "server": { "type": "string", "description": "Target server name for Docker operations. Empty means local machine." },
+        "container": { "type": "string", "description": "Container name to inspect." },
+        "lines": { "type": "number", "description": "Number of log lines to fetch." },
+        "grep": { "type": "string", "description": "Keyword filter for log lines." }
+      },
+      "optional_parameters": ["server", "container", "lines", "grep"],
       "utterance_samples": [
         "show me docker logs for nginx",
         "check the api container logs on prod-web",
@@ -92,12 +116,25 @@
         "show docker container status on staging",
         "check all docker containers on the server",
         "get logs from the web container with filter ERROR",
-        "is the nginx container running on production"
+        "is the nginx container running on production",
+        "how many docker containers are running on server AIT5252",
+        "how many containers are running on prod-web",
+        "list docker containers on staging",
+        "check docker containers on AIT5252",
+        "show running containers on the server",
+        "count docker containers on production"
       ]
     },
     "deploy": {
       "type": "logic",
       "description": "Deploy a project on a server: git pull the latest code, install dependencies, build, and restart the service.",
+      "parameters": {
+        "server": { "type": "string", "description": "Target server name to deploy to. Empty means local machine." },
+        "path": { "type": "string", "description": "Project directory path on the server." },
+        "branch": { "type": "string", "description": "Git branch to deploy." },
+        "service": { "type": "string", "description": "Service name to restart after deploy." }
+      },
+      "optional_parameters": ["server", "path", "branch", "service"],
       "utterance_samples": [
         "deploy the project at /var/www/app on prod-web",
         "deploy to production from the main branch",
@@ -110,7 +147,11 @@
     },
     "launch_agent": {
       "type": "logic",
-      "description": "Launch an AI agent to handle a complex multi-step task described in natural language. Use when the task requires reasoning, coding, troubleshooting, or multiple steps.",
+      "description": "FALLBACK FUNCTION: Call this function for any infrastructure/server/DevOps/sysadmin task that does not clearly match another action. Handles all server administration, troubleshooting, diagnostics, scripting, automation, configuration, package management, firewall setup, SSL renewal, monitoring, backups, user management, network troubleshooting, deployment, and any other infrastructure task expressed in natural language. When in doubt, call this function.",
+      "parameters": {
+        "prompt": { "type": "string", "description": "The full user request or task description to give to the agent." }
+      },
+      "optional_parameters": ["prompt"],
       "utterance_samples": [
         "investigate why the API is returning 500 errors on prod",
         "analyse the logs and find what is causing slowdowns",
@@ -118,7 +159,32 @@
         "write a script to rotate the application logs",
         "troubleshoot the failing deployment on staging",
         "debug why the service keeps restarting on prod-web",
-        "diagnose the database connection issue on the server"
+        "diagnose the database connection issue on the server",
+        "install and configure nginx on the new server",
+        "set up a firewall with ufw on prod-web",
+        "renew SSL certificates on all servers",
+        "add a new user to the staging server",
+        "configure monitoring for the api service",
+        "set up daily database backups to S3",
+        "check why the network is slow on the database server",
+        "migrate the application from the old server to the new one",
+        "update all packages and reboot if necessary",
+        "set up a new docker compose stack for the staging environment",
+        "configure fail2ban on the production server",
+        "optimise the postgresql configuration for better performance",
+        "create a systemd service for the custom webhook handler",
+        "add swap space on the app server",
+        "set up logrotate configuration for nginx logs",
+        "configure automatic security updates",
+        "install nodejs and pm2 on the web server",
+        "set up a reverse proxy with nginx for the api",
+        "check the raid status and disk health on all servers",
+        "configure ssh key-based authentication for a new team member",
+        "set up a VPN connection between staging and production",
+        "run any infrastructure or server task",
+        "I need help with something on the server",
+        "can you handle a server task for me",
+        "help me with an infrastructure issue"
       ]
     },
     "list_agents": {

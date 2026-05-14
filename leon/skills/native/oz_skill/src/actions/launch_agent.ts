@@ -5,6 +5,7 @@ import { Settings } from '@sdk/settings'
 
 import {
   errorMessage,
+  findServerInUtterance,
   getOzConfig,
   getToken,
   launchAndWait,
@@ -29,13 +30,16 @@ export const run: ActionFunction = async function (params) {
     const cfg = await getOzConfig(settings)
     const token = await getToken(cfg, network)
 
-    const server = serverName ? await resolveServerByName(serverName, cfg.apiUrl, token, network) : null
+    let server = serverName ? await resolveServerByName(serverName, cfg.apiUrl, token, network) : null
     if (serverName && !server) {
       await leon.answer({
         key: 'error',
         data: { message: `Server '${serverName}' not found in Oz. Register it at /api/servers first.` },
       })
       return
+    }
+    if (!server) {
+      server = await findServerInUtterance(prompt, cfg.apiUrl, token, network)
     }
 
     await leon.answer({ key: 'launching' })
