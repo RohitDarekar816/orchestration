@@ -79,7 +79,8 @@ async def main():
             user = User(
                 email='admin@oz.local',
                 hashed_password=hash_password('admin123'),
-                is_admin=True
+                full_name='Admin',
+                role='admin'
             )
             db.add(user)
             await db.commit()
