@@ -35,7 +35,7 @@ services:
   web:
     image: nginx:alpine
     ports:
-      - "3000:80"
+      - "8090:80"
     volumes:
       - ../web:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
@@ -126,7 +126,8 @@ services:
       LEON_PORT: "5366"
       LEON_HOST: http://0.0.0.0
       LEON_LANG: en-US
-      LEON_LLM: llamacpp/qwen2.5-1.5b-instruct-q4_k_m.gguf
+      LEON_LLM: groq/llama-3.1-8b-instant
+      LEON_GROQ_API_KEY: ${GROQ_API_KEY}
       LEON_LLAMACPP_BASE_URL: http://llama-cpp:8080/v1
       LEON_OVER_HTTP: "true"
       LEON_WAKE_WORD: "false"
@@ -140,7 +141,7 @@ services:
       OZ_API_URL: http://api:8000/api
       OZ_EMAIL: admin@oz.local
       OZ_PASSWORD: admin123
-      OZ_DEFAULT_AGENT_TYPE: oz-local
+      OZ_DEFAULT_AGENT_TYPE: opencode
       OZ_DEFAULT_MAX_RUNTIME: "300"
     volumes:
       - leon_profile:/root/.leon

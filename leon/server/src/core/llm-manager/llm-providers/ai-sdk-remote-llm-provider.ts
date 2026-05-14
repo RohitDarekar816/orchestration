@@ -651,16 +651,6 @@ export default class AISDKRemoteLLMProvider {
         : {
             reasoningEffort: 'high'
           }
-    } else if (this.config.flavor === 'groq') {
-      providerOptions['groq'] = completionParams.disableThinking === true
-        ? {
-            reasoningEffort: 'none',
-            reasoningFormat: 'hidden'
-          }
-        : {
-            reasoningEffort: 'medium',
-            reasoningFormat: 'parsed'
-          }
     }
 
     if (Object.keys(providerOptions).length > 0) {

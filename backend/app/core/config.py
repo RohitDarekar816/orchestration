@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # Set to empty string to disable local LLM injection (agents must supply their own keys).
     oz_llamacpp_url: str = ""
     oz_opencode_model: str = "openai/gpt-4o-mini"
+    oz_nvidia_api_key: str = ""
 
     allowed_agents: list[str] = ["claude-code", "codex", "gemini-cli", "opencode", "custom"]
 

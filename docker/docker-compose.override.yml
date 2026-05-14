@@ -9,7 +9,8 @@ services:
       - OZ_RUNNER=docker
       - OZ_AGENT_NETWORK=host
       - OZ_LLAMACPP_URL=http://localhost:11435/v1
-      - OZ_OPENCODE_MODEL=openai/gpt-4o-mini
+      - OZ_OPENCODE_MODEL=opencode/deepseek-v4-flash-free
+      - OZ_NVIDIA_API_KEY=${NVIDIA_API_KEY}
 
   web:
     ports:

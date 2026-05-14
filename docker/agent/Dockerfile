@@ -48,6 +48,9 @@ RUN npm install -g \
 COPY oz_local_agent.py /usr/local/bin/oz-local
 RUN chmod +x /usr/local/bin/oz-local
 
+# ── opencode config (NVIDIA provider; API key supplied at runtime via env var) ─
+COPY opencode-config.json /root/.config/opencode/config.json
+
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

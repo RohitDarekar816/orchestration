@@ -171,11 +171,21 @@ class DockerAgentRunner:
         if self.agent_run.agent_type == "claude-code":
             env_vars["OZ_PROMPT"] = self.agent_run.prompt or ""
 
-        # opencode / oz-local: point at the local llama-cpp server if configured,
-        # so agents can run without any external API keys.
-        if self.agent_run.agent_type in ("opencode", "oz-local") and settings.oz_llamacpp_url:
+        # oz-local uses the local llama-cpp server.
+        if self.agent_run.agent_type == "oz-local" and settings.oz_llamacpp_url:
             env_vars.setdefault("OPENAI_BASE_URL", settings.oz_llamacpp_url)
             env_vars.setdefault("OPENAI_API_KEY", "sk-local")
+
+        # opencode: free opencode/* models need no credentials.
+        # Inject NVIDIA key only if the model requires it.
+        if self.agent_run.agent_type == "opencode":
+            model = settings.oz_opencode_model or ""
+            if not model.startswith("opencode/"):
+                if settings.oz_nvidia_api_key:
+                    env_vars.setdefault("NVIDIA_API_KEY", settings.oz_nvidia_api_key)
+                elif settings.oz_llamacpp_url:
+                    env_vars.setdefault("OPENAI_BASE_URL", settings.oz_llamacpp_url)
+                    env_vars.setdefault("OPENAI_API_KEY", "sk-local")
 
         cmd = self._build_cmd()
         image = self.agent_run.image or "oz-agent:latest"
@@ -264,10 +274,16 @@ class DockerAgentRunner:
         elif agent_type == "codex":
             return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", prompt]
         elif agent_type == "opencode":
-            cmd = ["opencode", "run"]
-            if settings.oz_llamacpp_url and settings.oz_opencode_model:
+            cmd = ["opencode", "run", "--dangerously-skip-permissions"]
+            if settings.oz_opencode_model:
                 cmd += ["-m", settings.oz_opencode_model]
-            cmd += [prompt]
+            preamble = (
+                "SSH RULE: When using sshpass, ALWAYS wrap the password in single quotes. "
+                "Correct form: sshpass -p 'PASSWORD' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 USER@HOST 'COMMAND'\n"
+                "OUTPUT RULE: After completing the task, write ONE plain-English sentence summarising the result. "
+                "No markdown, no code blocks, no bullet points.\n\n"
+            )
+            cmd += [preamble + prompt]
             return cmd
         elif agent_type == "oz-local":
             return ["python3", "/usr/local/bin/oz-local", prompt]
