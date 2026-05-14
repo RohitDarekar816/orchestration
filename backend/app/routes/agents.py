@@ -4,7 +4,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
@@ -15,6 +15,7 @@ from app.models.log import AgentLog
 from app.models.user import User
 from app.services.agent_runner import get_runner
 from app.services.audit_service import AuditService
+from app.services.server_service import ServerService
 from app.services.skill_service import SkillService
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -24,6 +25,7 @@ class AgentLaunchRequest(BaseModel):
     agent_type: str
     prompt: str | None = None
     skill_id: int | None = None
+    server_id: int | None = None
     target_repos: list[str] | None = None
     env_vars: dict | None = None
     max_runtime: int | None = None
@@ -48,7 +50,7 @@ async def launch_agent(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if req.agent_type not in ("claude-code", "codex", "gemini-cli", "opencode", "custom"):
+    if req.agent_type not in ("claude-code", "codex", "gemini-cli", "opencode", "oz-local", "custom"):
         raise HTTPException(status_code=400, detail=f"Unsupported agent: {req.agent_type}")
 
     prompt = req.prompt
@@ -65,9 +67,32 @@ async def launch_agent(
             skill_env = json.loads(raw) if isinstance(raw, str) else (raw or {})
             env_vars = {**skill_env, **env_vars}
 
+    if req.server_id:
+        server_svc = ServerService(db)
+        server = await server_svc.get_server(req.server_id, user.id)
+        if not server:
+            raise HTTPException(status_code=404, detail="Server not found")
+        server_env = await server_svc.get_server_env(server)
+        env_vars = {**server_env, **env_vars}
+        server_context = ServerService.build_server_prompt_context(server)
+        prompt = f"{server_context}\n\n## Task\n{prompt or ''}"
+
+    # Reject if the user already has too many agents running concurrently.
+    running_count = await db.scalar(
+        select(func.count(AgentRun.id)).where(
+            AgentRun.user_id == user.id,
+            AgentRun.status == AgentStatus.RUNNING,
+        )
+    )
+    if (running_count or 0) >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many concurrent agent runs (limit: 5). Wait for one to finish or cancel it.",
+        )
+
     agent_run = AgentRun(
         user_id=user.id,
-        agent_type=req.agent_type or (skill.agent_type if req.skill_id else req.agent_type),
+        agent_type=req.agent_type,
         prompt=prompt,
         skill_id=req.skill_id,
         target_repos=json.dumps(req.target_repos or []),
@@ -183,6 +208,40 @@ async def cancel_agent(
     return {"id": agent.id, "status": agent.status.value}
 
 
+@router.post("/{agent_id}/retry")
+async def retry_agent(
+    agent_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    if agent.status not in (AgentStatus.FAILED, AgentStatus.CANCELLED):
+        raise HTTPException(status_code=400, detail="Only failed or cancelled agents can be retried")
+
+    agent.status = AgentStatus.PENDING
+    agent.started_at = None
+    agent.finished_at = None
+    agent.exit_code = None
+    agent.error = None
+    agent.container_id = None
+    await db.commit()
+
+    asyncio.create_task(_run_agent_in_background(agent.id, db))
+
+    audit = AuditService(db)
+    await audit.log(
+        user_id=user.id,
+        action="agent.retry",
+        resource_type="agent_run",
+        resource_id=str(agent_id),
+    )
+
+    return {"id": agent.id, "status": agent.status.value, "message": "Agent retry queued"}
+
+
 @router.get("/{agent_id}/logs")
 async def get_logs(
     agent_id: int,
@@ -223,31 +282,65 @@ async def agent_ws(websocket: WebSocket, agent_id: int):
         active_sessions.pop(agent_id, None)
 
 
-async def _run_agent_in_background(agent_id: int, _db: AsyncSession):
+async def _run_agent_in_background(agent_id: int, _db: AsyncSession, _max_auto_retries: int = 2):
     import traceback
 
     from app.core.database import async_session as new_session
 
-    try:
-        async with new_session() as session:
-            result = await session.execute(select(AgentRun).where(AgentRun.id == agent_id))
-            agent = result.scalar_one_or_none()
-            if agent:
+    for attempt in range(1, _max_auto_retries + 2):
+        run_started = datetime.datetime.now(datetime.UTC)
+        try:
+            async with new_session() as session:
+                result = await session.execute(select(AgentRun).where(AgentRun.id == agent_id))
+                agent = result.scalar_one_or_none()
+                if not agent:
+                    return
                 runner = get_runner(agent, session)
                 await runner.run()
-    except Exception as e:
-        async with new_session() as session:
-            result = await session.execute(select(AgentRun).where(AgentRun.id == agent_id))
-            agent = result.scalar_one_or_none()
-            if agent:
-                agent.status = AgentStatus.FAILED
-                agent.error = f"{type(e).__name__}: {e}"
-                agent.finished_at = datetime.datetime.now(datetime.UTC)
-                await session.commit()
-                err_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
-                log = AgentLog(agent_run_id=agent_id, stream="error", content=err_msg)
-                session.add(log)
-                await session.commit()
+                await session.refresh(agent)
+
+                if agent.status == AgentStatus.COMPLETED:
+                    return
+
+                # Only auto-retry if the agent crashed within 30 s (startup/tool failure).
+                # If it ran longer the task itself failed — no point retrying.
+                run_seconds = (datetime.datetime.now(datetime.UTC) - run_started).total_seconds()
+                if run_seconds > 30 or attempt > _max_auto_retries:
+                    return
+
+                backoff = 5 * attempt
+                async with new_session() as s2:
+                    r2 = await s2.execute(select(AgentRun).where(AgentRun.id == agent_id))
+                    a2 = r2.scalar_one_or_none()
+                    if a2:
+                        log = AgentLog(
+                            agent_run_id=agent_id,
+                            stream="info",
+                            content=f"[Oz] Crash detected after {run_seconds:.0f}s — retrying in {backoff}s (attempt {attempt + 1}/{_max_auto_retries + 1})",
+                        )
+                        s2.add(log)
+                        a2.status = AgentStatus.PENDING
+                        a2.exit_code = None
+                        a2.finished_at = None
+                        a2.container_id = None
+                        await s2.commit()
+
+                await asyncio.sleep(backoff)
+
+        except Exception as e:
+            async with new_session() as session:
+                result = await session.execute(select(AgentRun).where(AgentRun.id == agent_id))
+                agent = result.scalar_one_or_none()
+                if agent:
+                    agent.status = AgentStatus.FAILED
+                    agent.error = f"{type(e).__name__}: {e}"
+                    agent.finished_at = datetime.datetime.now(datetime.UTC)
+                    await session.commit()
+                    err_msg = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+                    log = AgentLog(agent_run_id=agent_id, stream="error", content=err_msg)
+                    session.add(log)
+                    await session.commit()
+            return
 
 
 def _dt(val) -> str | None:

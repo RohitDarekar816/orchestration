@@ -1,155 +1,182 @@
 {
   "$schema": "../../../schemas/skill-schemas/skill-locale-config.json",
   "actions": {
-    "launch_agent": {
+    "greet": {
       "answers": {
-        "launching": [
-          {
-            "text": "Launching an Oz agent to handle that. One moment...",
-            "speech": "Launching an Oz agent to handle that. One moment."
-          }
-        ],
-        "launched": [
-          {
-            "text": "Agent launched! ID <strong>#{{ agent_id }}</strong>. It's currently <strong>{{ status }}</strong>.",
-            "speech": "Agent launched! ID {{ agent_id }}. It's currently {{ status }}."
-          }
-        ],
-        "result": [
-          {
-            "text": "Here's what the agent found:<br><br><pre>{{ logs }}</pre>",
-            "speech": "Here's what the agent found."
-          }
-        ],
-        "error": [
-          {
-            "text": "Sorry, I couldn't launch the agent: {{ message }}",
-            "speech": "Sorry, I couldn't launch the agent."
-          }
-        ],
-        "no_prompt": [
-          {
-            "text": "What task would you like the agent to do? Please describe it.",
-            "speech": "What task would you like the agent to do? Please describe it."
-          }
-        ]
-      }
-    },
-    "list_agents": {
-      "answers": {
-        "listing": [
-          {
-            "text": "Let me check the recent agent runs...",
-            "speech": "Let me check the recent agent runs."
-          }
-        ],
-        "empty": [
-          {
-            "text": "No agent runs found.",
-            "speech": "No agent runs found."
-          }
-        ],
-        "list": [
-          {
-            "text": "Here are the recent runs:<br><br>{{ agents }}",
-            "speech": "Here are the recent runs."
-          }
-        ],
-        "error": [
-          {
-            "text": "Sorry, I couldn't fetch the agent list: {{ message }}",
-            "speech": "Sorry, I couldn't fetch the agent list."
-          }
-        ]
-      }
-    },
-    "get_agent": {
-      "answers": {
-        "fetching": [
-          {
-            "text": "Let me check on that agent run...",
-            "speech": "Let me check on that agent run."
-          }
-        ],
-        "not_found": [
-          {
-            "text": "Agent run #{{ agent_id }} was not found.",
-            "speech": "Agent run {{ agent_id }} was not found."
-          }
-        ],
-        "detail": [
-          {
-            "text": "Agent <strong>#{{ agent_id }}</strong><br>Type: {{ type }}<br>Status: <strong>{{ status }}</strong><br>Created: {{ created }}<br><br>{{ logs_block }}",
-            "speech": "Agent {{ agent_id }}. Type: {{ type }}. Status: {{ status }}."
-          }
-        ],
-        "error": [
-          {
-            "text": "Sorry, I couldn't fetch agent details: {{ message }}",
-            "speech": "Sorry, I couldn't fetch agent details."
-          }
-        ]
-      }
-    },
-    "cancel_agent": {
-      "answers": {
-        "cancelling": [
-          {
-            "text": "Cancelling agent run...",
-            "speech": "Cancelling agent run."
-          }
-        ],
-        "cancelled": [
-          {
-            "text": "Agent #{{ agent_id }} has been cancelled.",
-            "speech": "Agent {{ agent_id }} has been cancelled."
-          }
-        ],
-        "not_found": [
-          {
-            "text": "Agent #{{ agent_id }} was not found.",
-            "speech": "Agent {{ agent_id }} was not found."
-          }
-        ],
-        "error": [
-          {
-            "text": "Sorry, I couldn't cancel the agent: {{ message }}",
-            "speech": "Sorry, I couldn't cancel the agent."
-          }
+        "greeting": [
+          { "text": "I'm Oz, your infrastructure assistant. I can check server health, fetch logs, run commands, deploy projects, and launch AI agents for any system task. What do you need?", "speech": "I'm Oz, your infrastructure assistant. What do you need?" }
         ]
       }
     },
     "run_bash": {
       "answers": {
         "executing": [
-          {
-            "text": "Launching an Oz agent to run that command. One moment...",
-            "speech": "Launching an Oz agent to run that command. One moment."
-          }
+          { "text": "Launching an Oz agent to run that command. One moment...", "speech": "Launching an Oz agent to run that command. One moment." }
+        ],
+        "still_working": [
+          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
         ],
         "launched": [
-          {
-            "text": "Agent launched! ID <strong>#{{ agent_id }}</strong>. It's currently <strong>{{ status }}</strong>.",
-            "speech": "Agent launched! ID {{ agent_id }}. It's currently {{ status }}."
-          }
+          { "text": "Agent <strong>#{{ agent_id }}</strong> — status: <strong>{{ status }}</strong>.", "speech": "Agent {{ agent_id }}, status {{ status }}." }
         ],
         "result": [
-          {
-            "text": "Here's the command output:<br><br><pre>{{ logs }}</pre>",
-            "speech": "Here's the command output."
-          }
+          { "text": "{{ logs }}", "speech": "Here's the output." }
         ],
         "error": [
-          {
-            "text": "Sorry, I couldn't run the command: {{ message }}",
-            "speech": "Sorry, I couldn't run the command."
-          }
+          { "text": "Sorry, something went wrong: {{ message }}", "speech": "Sorry, something went wrong." }
         ],
         "no_command": [
-          {
-            "text": "What command would you like me to run?",
-            "speech": "What command would you like me to run?"
-          }
+          { "text": "What command would you like me to run?", "speech": "What command would you like me to run?" }
+        ]
+      }
+    },
+    "server_health": {
+      "answers": {
+        "checking_health": [
+          { "text": "Checking the health of <strong>{{ server }}</strong>. This may take a moment...", "speech": "Checking server health. One moment." }
+        ],
+        "still_working": [
+          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
+        ],
+        "health_result": [
+          { "text": "{{ logs }}", "speech": "Here is the health report." }
+        ],
+        "error": [
+          { "text": "Failed to check server health: {{ message }}", "speech": "Failed to check server health." }
+        ]
+      }
+    },
+    "app_logs": {
+      "answers": {
+        "fetching_logs": [
+          { "text": "Fetching application logs from <strong>{{ server }}</strong>...", "speech": "Fetching application logs. One moment." }
+        ],
+        "still_working": [
+          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
+        ],
+        "logs_result": [
+          { "text": "{{ logs }}", "speech": "Here are the logs." }
+        ],
+        "error": [
+          { "text": "Failed to fetch logs: {{ message }}", "speech": "Failed to fetch logs." }
+        ]
+      }
+    },
+    "docker_logs": {
+      "answers": {
+        "fetching_docker_logs": [
+          { "text": "Fetching Docker logs for <strong>{{ container }}</strong> on <strong>{{ server }}</strong>...", "speech": "Fetching Docker logs. One moment." }
+        ],
+        "still_working": [
+          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
+        ],
+        "docker_logs_result": [
+          { "text": "{{ logs }}", "speech": "Here are the Docker logs." }
+        ],
+        "error": [
+          { "text": "Failed to fetch Docker logs: {{ message }}", "speech": "Failed to fetch Docker logs." }
+        ]
+      }
+    },
+    "deploy": {
+      "answers": {
+        "deploying": [
+          { "text": "Starting deployment of <strong>{{ path }}</strong> on <strong>{{ server }}</strong>. This may take a few minutes...", "speech": "Starting deployment. This may take a few minutes." }
+        ],
+        "still_working": [
+          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
+        ],
+        "deploy_result": [
+          { "text": "{{ logs }}", "speech": "Deployment finished. Status: {{ status }}." }
+        ],
+        "no_path": [
+          { "text": "Please specify the project path to deploy. For example: deploy /var/www/myapp on prod-web.", "speech": "Please specify the project path to deploy." }
+        ],
+        "error": [
+          { "text": "Deployment failed: {{ message }}", "speech": "Deployment failed." }
+        ]
+      }
+    },
+    "launch_agent": {
+      "answers": {
+        "launching": [
+          { "text": "Launching an Oz agent to handle that. One moment...", "speech": "Launching an Oz agent. One moment." }
+        ],
+        "still_working": [
+          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
+        ],
+        "launched": [
+          { "text": "Agent <strong>#{{ agent_id }}</strong> — status: <strong>{{ status }}</strong>.", "speech": "Agent {{ agent_id }}, status {{ status }}." }
+        ],
+        "result": [
+          { "text": "{{ logs }}", "speech": "Here's what the agent found." }
+        ],
+        "error": [
+          { "text": "Sorry, I couldn't launch the agent: {{ message }}", "speech": "Sorry, I couldn't launch the agent." }
+        ],
+        "no_prompt": [
+          { "text": "What task would you like the agent to do? Please describe it.", "speech": "What task would you like the agent to do?" }
+        ]
+      }
+    },
+    "list_agents": {
+      "answers": {
+        "listing": [
+          { "text": "Let me check the recent agent runs...", "speech": "Let me check the recent agent runs." }
+        ],
+        "empty": [
+          { "text": "No agent runs found.", "speech": "No agent runs found." }
+        ],
+        "list": [
+          { "text": "Recent agent runs:<br><br>{{ agents }}", "speech": "Here are the recent runs." }
+        ],
+        "error": [
+          { "text": "Couldn't fetch the agent list: {{ message }}", "speech": "Couldn't fetch the agent list." }
+        ]
+      }
+    },
+    "get_agent": {
+      "answers": {
+        "fetching": [
+          { "text": "Let me check on that agent run...", "speech": "Let me check on that agent run." }
+        ],
+        "not_found": [
+          { "text": "Agent run #{{ agent_id }} was not found.", "speech": "Agent run {{ agent_id }} was not found." }
+        ],
+        "detail": [
+          { "text": "Agent <strong>#{{ agent_id }}</strong><br>Type: {{ type }}<br>Status: <strong>{{ status }}</strong><br>Created: {{ created }}<br><br>{{ logs_block }}", "speech": "Agent {{ agent_id }}. Type: {{ type }}. Status: {{ status }}." }
+        ],
+        "error": [
+          { "text": "Couldn't fetch agent details: {{ message }}", "speech": "Couldn't fetch agent details." }
+        ]
+      }
+    },
+    "cancel_agent": {
+      "answers": {
+        "cancelling": [
+          { "text": "Cancelling agent run...", "speech": "Cancelling agent run." }
+        ],
+        "cancelled": [
+          { "text": "Agent #{{ agent_id }} has been cancelled.", "speech": "Agent {{ agent_id }} has been cancelled." }
+        ],
+        "not_found": [
+          { "text": "Agent #{{ agent_id }} was not found.", "speech": "Agent {{ agent_id }} was not found." }
+        ],
+        "error": [
+          { "text": "Couldn't cancel the agent: {{ message }}", "speech": "Couldn't cancel the agent." }
+        ]
+      }
+    },
+    "list_servers": {
+      "answers": {
+        "no_servers": [
+          { "text": "No servers registered yet. Add one via the Oz web dashboard or POST /api/servers.", "speech": "No servers registered yet." }
+        ],
+        "servers_list": [
+          { "text": "{{ count }} registered server(s):<br><br>{{ servers }}", "speech": "Here are your registered servers." }
+        ],
+        "error": [
+          { "text": "Couldn't fetch the server list: {{ message }}", "speech": "Couldn't fetch the server list." }
         ]
       }
     }

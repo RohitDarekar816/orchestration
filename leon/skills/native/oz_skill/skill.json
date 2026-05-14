@@ -3,56 +3,162 @@
   "name": "Oz",
   "icon_name": "terminal-line",
   "bridge": "nodejs",
-  "version": "1.0.0",
-  "description": "Oz platform launching AI agents for system tasks: Docker, commands, servers, monitoring, automation, troubleshooting, coding, file ops, and any other user requests.",
+  "version": "1.1.0",
+  "description": "Oz platform for Linux server administration tasks: running shell commands, checking server health metrics, fetching application or Docker logs, deploying projects, and launching AI agents for infrastructure automation.",
   "author": {
     "name": "Oz Team",
     "url": "https://opencode.ai"
   },
   "action_notes": [
-    "For Docker, commands, system checks, monitoring, processes, disk, network → use run_bash",
-    "For complex tasks, automation, coding, troubleshooting, multi-step work → use launch_agent"
+    "For greetings, social chat, or non-infrastructure questions → use greet",
+    "For quick bash/shell commands → use run_bash",
+    "For server CPU/memory/disk/service status → use server_health",
+    "For application or system log inspection → use app_logs",
+    "For Docker container logs and status → use docker_logs",
+    "For deploying a project (git pull, install, restart) → use deploy",
+    "For complex multi-step or open-ended tasks → use launch_agent",
+    "For listing registered servers → use list_servers",
+    "When a server name is mentioned, pass it as the server argument"
   ],
   "actions": {
+    "greet": {
+      "type": "logic",
+      "description": "Handle greetings, social questions, and anything not related to servers or infrastructure. Use for: hello, hi, how are you, what can you do, who are you, thanks, goodbye.",
+      "utterance_samples": [
+        "how are you",
+        "hello",
+        "hi there",
+        "what can you do",
+        "who are you",
+        "what are you",
+        "thank you",
+        "thanks",
+        "goodbye",
+        "good morning",
+        "what is your name"
+      ]
+    },
+    "run_bash": {
+      "type": "logic",
+      "description": "Run a bash or shell command on this machine or a named server. Use for quick one-shot commands: docker ps, df -h, free -m, ls, curl, etc.",
+      "utterance_samples": [
+        "run docker ps",
+        "execute ls -la /var/www",
+        "check disk space with df -h",
+        "run docker ps -a on prod-web",
+        "check memory with free -m",
+        "list running processes",
+        "run uptime on the staging server",
+        "execute netstat -tlnp on db-server"
+      ]
+    },
+    "server_health": {
+      "type": "logic",
+      "description": "Check the health of a server: CPU, memory, disk, load average, failed services, and Docker container status.",
+      "utterance_samples": [
+        "check server health",
+        "server health check on prod-web",
+        "check health of the database server",
+        "show CPU and memory usage on prod",
+        "check system resources on app-server",
+        "disk space check on production server",
+        "check failed services on the server",
+        "server status report for staging",
+        "run health check on web server"
+      ]
+    },
+    "app_logs": {
+      "type": "logic",
+      "description": "Retrieve and inspect application or system logs from a server. Supports log file paths, service names, and keyword filtering.",
+      "utterance_samples": [
+        "show application logs",
+        "fetch nginx error logs on prod-web",
+        "get last 200 lines of /var/log/app/error.log",
+        "show logs for the api service on staging",
+        "fetch logs on production filtered by ERROR",
+        "tail the app logs on the web server",
+        "show recent errors in the application logs",
+        "get last 50 lines from /var/log/syslog on db-server"
+      ]
+    },
+    "docker_logs": {
+      "type": "logic",
+      "description": "Get Docker container logs and status. Can target a specific container or show all containers and their health.",
+      "utterance_samples": [
+        "show me docker logs for nginx",
+        "check the api container logs on prod-web",
+        "get last 100 lines of logs for the postgres container",
+        "why is the redis container crashing",
+        "show docker container status on staging",
+        "check all docker containers on the server",
+        "get logs from the web container with filter ERROR",
+        "is the nginx container running on production"
+      ]
+    },
+    "deploy": {
+      "type": "logic",
+      "description": "Deploy a project on a server: git pull the latest code, install dependencies, build, and restart the service.",
+      "utterance_samples": [
+        "deploy the project at /var/www/app on prod-web",
+        "deploy to production from the main branch",
+        "pull and restart the api service on staging",
+        "deploy /home/ubuntu/myapp to the web server",
+        "update and restart the nginx service on prod",
+        "deploy the app from branch develop on staging-server",
+        "run deployment for /opt/services/backend"
+      ]
+    },
     "launch_agent": {
       "type": "logic",
-      "description": "Launch an AI agent to handle complex tasks like automation, coding, troubleshooting, and multi-step workflows described in natural language.",
+      "description": "Launch an AI agent to handle a complex multi-step task described in natural language. Use when the task requires reasoning, coding, troubleshooting, or multiple steps.",
       "utterance_samples": [
-        "check how many docker containers are running",
-        "run docker ps on the server",
-        "check the server status",
-        "list all running processes",
-        "check disk usage",
-        "tell me about the system",
-        "run a command for me",
-        "check what's happening on the server",
-        "how many containers are running",
-        "execute docker ps",
-        "show me docker container status"
+        "investigate why the API is returning 500 errors on prod",
+        "analyse the logs and find what is causing slowdowns",
+        "set up a cron job to back up the database daily",
+        "write a script to rotate the application logs",
+        "troubleshoot the failing deployment on staging",
+        "debug why the service keeps restarting on prod-web",
+        "diagnose the database connection issue on the server"
       ]
     },
     "list_agents": {
       "type": "logic",
-      "description": "List recent agent runs and their current status (completed, running, failed)."
+      "description": "List recent agent runs and their current status (completed, running, failed).",
+      "utterance_samples": [
+        "list recent agent runs",
+        "show me the last agent tasks",
+        "what agents have been running",
+        "show agent history"
+      ]
     },
     "get_agent": {
       "type": "logic",
-      "description": "Get details, status and full output logs of a specific agent run by its ID."
+      "description": "Get details, status and full output logs of a specific agent run by its ID.",
+      "utterance_samples": [
+        "get status of agent 42",
+        "show output for agent run 7",
+        "what did agent 15 do",
+        "check on agent number 3"
+      ]
     },
     "cancel_agent": {
       "type": "logic",
-      "description": "Cancel a currently running agent by its ID."
-    },
-    "run_bash": {
-      "type": "logic",
-      "description": "Run bash/server commands: Docker, processes, disk, network, files, system checks, monitoring, and any shell command.",
+      "description": "Cancel a currently running agent by its ID.",
       "utterance_samples": [
-        "run docker ps",
-        "execute ls -la",
-        "check disk space with df -h",
-        "run docker ps -a",
-        "check memory with free -m",
-        "list running processes"
+        "cancel agent 5",
+        "stop agent run 12",
+        "kill agent number 8"
+      ]
+    },
+    "list_servers": {
+      "type": "logic",
+      "description": "List all registered servers in Oz, showing their names, hosts, and authentication type.",
+      "utterance_samples": [
+        "list my servers",
+        "show registered servers",
+        "what servers do I have",
+        "show me all available servers",
+        "which servers are configured in Oz"
       ]
     }
   }

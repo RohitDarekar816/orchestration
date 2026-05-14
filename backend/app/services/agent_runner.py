@@ -166,8 +166,23 @@ class DockerAgentRunner:
             except json.JSONDecodeError:
                 pass
 
+        # claude-code reads its prompt from stdin; pass it via env var so the
+        # entrypoint can pipe it in without any shell escaping issues.
+        if self.agent_run.agent_type == "claude-code":
+            env_vars["OZ_PROMPT"] = self.agent_run.prompt or ""
+
+        # opencode / oz-local: point at the local llama-cpp server if configured,
+        # so agents can run without any external API keys.
+        if self.agent_run.agent_type in ("opencode", "oz-local") and settings.oz_llamacpp_url:
+            env_vars.setdefault("OPENAI_BASE_URL", settings.oz_llamacpp_url)
+            env_vars.setdefault("OPENAI_API_KEY", "sk-local")
+
         cmd = self._build_cmd()
         image = self.agent_run.image or "oz-agent:latest"
+
+        # Network mode is host so VPN routes on the host are reachable from
+        # inside the container. Override with OZ_AGENT_NETWORK env var if needed.
+        network_mode = settings.oz_agent_network
 
         def _run_sync():
             return self.client.containers.run(
@@ -175,9 +190,16 @@ class DockerAgentRunner:
                 command=cmd,
                 environment=env_vars,
                 working_dir="/workspace",
-                tmpfs={"/workspace": "rw,noexec,nosuid,size=64m"},
+                # noexec removed: agents must be able to write and execute scripts.
+                # /tmp is a separate tmpfs so SSH keys and temp scripts are isolated.
+                tmpfs={
+                    "/workspace": "rw,nosuid,size=256m",
+                    "/tmp": "rw,nosuid,nodev,size=64m",
+                },
+                # Docker socket lets the agent manage containers on the host.
+                volumes={"/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"}},
                 detach=True,
-                network_mode="bridge",
+                network_mode=network_mode,
                 mem_limit="4g",
                 cpu_period=100000,
                 cpu_quota=400000,
@@ -196,9 +218,16 @@ class DockerAgentRunner:
             )
             exit_code = result["StatusCode"]
 
-            logs_raw = self.container.logs(stdout=True, stderr=True).decode()
-            for line in logs_raw.splitlines():
-                await self._log("stdout", line)
+            # Collect stdout and stderr separately so callers can distinguish
+            # clean output (stdout) from debug/trace (stderr).
+            stdout_raw = self.container.logs(stdout=True, stderr=False).decode()
+            stderr_raw = self.container.logs(stdout=False, stderr=True).decode()
+            for line in stdout_raw.splitlines():
+                if line.strip():
+                    await self._log("stdout", line)
+            for line in stderr_raw.splitlines():
+                if line.strip():
+                    await self._log("stderr", line)
 
             self.agent_run.exit_code = exit_code
             self.agent_run.status = AgentStatus.COMPLETED if exit_code == 0 else AgentStatus.FAILED
@@ -224,22 +253,27 @@ class DockerAgentRunner:
 
             await loop.run_in_executor(None, _cleanup)
 
-    def _build_cmd(self) -> str:
+    def _build_cmd(self) -> list[str]:
         prompt = self.agent_run.prompt or ""
         agent_type = self.agent_run.agent_type
 
         if agent_type == "claude-code":
-            return f'claude --print << "EOF"\n{prompt}\nEOF'
+            # Prompt is passed via OZ_PROMPT env var (set in run()) to avoid
+            # any shell escaping issues with multiline or quoted content.
+            return ["bash", "-c", "printf '%s' \"$OZ_PROMPT\" | claude --print"]
         elif agent_type == "codex":
-            escaped = prompt.replace('"', '\\"')
-            return f'codex exec --yolo --sandbox danger-full-access "{escaped}"'
+            return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", prompt]
         elif agent_type == "opencode":
-            escaped = prompt.replace('"', '\\"')
-            return f'opencode --prompt "{escaped}"'
+            cmd = ["opencode", "run"]
+            if settings.oz_llamacpp_url and settings.oz_opencode_model:
+                cmd += ["-m", settings.oz_opencode_model]
+            cmd += [prompt]
+            return cmd
+        elif agent_type == "oz-local":
+            return ["python3", "/usr/local/bin/oz-local", prompt]
         elif agent_type == "gemini-cli":
-            escaped = prompt.replace('"', '\\"')
-            return f'gemini -p "{escaped}"'
-        return prompt
+            return ["gemini", "-p", prompt]
+        return ["bash", "-c", prompt]
 
     async def _update_status(self, status: AgentStatus):
         self.agent_run.status = status

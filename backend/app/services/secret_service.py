@@ -11,12 +11,9 @@ settings = get_settings()
 def _get_cipher():
     from base64 import urlsafe_b64encode
 
-    if settings.debug:
-        key = Fernet.generate_key()
-    else:
-        raw = settings.secret_key.encode()
-        padded = raw.ljust(32, b"_")[:32]
-        key = urlsafe_b64encode(padded)
+    raw = settings.secret_key.encode()
+    padded = raw.ljust(32, b"_")[:32]
+    key = urlsafe_b64encode(padded)
     return Fernet(key)
 
 

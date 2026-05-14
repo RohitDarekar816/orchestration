@@ -27,6 +27,10 @@ ENV LEON_PYTHON_PATH=/usr/bin/python3
 ENV LEON_UV_PATH=/usr/local/bin/uv
 RUN pnpm install --frozen-lockfile && rm -rf /root/.local/share/pnpm/store /root/.cache /tmp/*
 
+COPY docker-entrypoint.sh /usr/local/bin/leon-entrypoint.sh
+RUN chmod +x /usr/local/bin/leon-entrypoint.sh
+
 EXPOSE 5366
 
+ENTRYPOINT ["/usr/local/bin/leon-entrypoint.sh"]
 CMD ["node", "server/dist/index.js"]

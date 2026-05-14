@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     max_agent_runtime_seconds: int = 3600
     max_agent_cost_usd: float = 50.0
     oz_runner: str = "local"
+    # "host" shares the host network stack so VPN routes are reachable from the
+    # container. Use "bridge" if you prefer network isolation and don't need VPN.
+    oz_agent_network: str = "host"
+
+    # Local llama-cpp server for opencode agents (OpenAI-compatible API).
+    # Set to empty string to disable local LLM injection (agents must supply their own keys).
+    oz_llamacpp_url: str = ""
+    oz_opencode_model: str = "openai/gpt-4o-mini"
 
     allowed_agents: list[str] = ["claude-code", "codex", "gemini-cli", "opencode", "custom"]
 

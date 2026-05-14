@@ -1,0 +1,29 @@
+# Port overrides — existing services on this host occupy 8000 and 8080.
+# Internal container-to-container communication is unchanged (api:8000, llama-cpp:8080).
+# Only the host-side bindings are remapped here.
+services:
+  api:
+    ports:
+      - "8100:8000"
+    environment:
+      - OZ_RUNNER=docker
+      - OZ_AGENT_NETWORK=host
+      - OZ_LLAMACPP_URL=http://localhost:11435/v1
+      - OZ_OPENCODE_MODEL=openai/gpt-4o-mini
+
+  web:
+    ports:
+      - "3000:80"
+
+  # Skip celery worker and beat for initial testing — agents run via asyncio tasks.
+  worker:
+    profiles:
+      - celery
+  beat:
+    profiles:
+      - celery
+
+  # oz-agent is build-only, never starts as a service.
+  oz-agent:
+    profiles:
+      - build
