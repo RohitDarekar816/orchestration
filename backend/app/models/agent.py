@@ -4,6 +4,8 @@ from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, Strin
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.models.user import User  # noqa: F401 — ensure User is registered for mapper resolution
+from app.models.skill import Skill  # noqa: F401 — ensure Skill is registered for mapper resolution
 
 
 class AgentStatus(str, enum.Enum):

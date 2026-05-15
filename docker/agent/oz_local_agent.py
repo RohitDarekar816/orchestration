@@ -153,6 +153,30 @@ def main():
         },
     ]
 
+    # If the raw output looks like a known file format, preserve it with
+    # [FILE:...][/FILE] markers so the Oz skill can render a file card.
+    FILE_SIGNATURES: list[tuple[str, str]] = [
+        (r'^version:\s*["\']\d.*\bservices:', 'docker-compose.yml'),
+        (r'^FROM\s+\S+', 'Dockerfile'),
+        (r'^\{.*\}', 'output.json'),
+        (r'^#!', 'script.sh'),
+    ]
+    first_200 = output[:200].strip()
+    detected_file = ''
+    for pattern, name in FILE_SIGNATURES:
+        if re.search(pattern, first_200, re.DOTALL):
+            detected_file = name
+            break
+
+    if detected_file:
+        # Bypass LLM summary for file content — output directly with markers.
+        log(f"[oz-local] Detected file content ({detected_file}), bypassing summary LLM.")
+        print(f"[FILE:{detected_file}]", flush=True)
+        print(output.strip(), flush=True)
+        print("[/FILE]", flush=True)
+        print(f"Retrieved {detected_file} ({len(output)} bytes).", flush=True)
+        sys.exit(0)
+
     log("[oz-local] Asking LLM for summary...")
     summary = llm(summary_messages)
 

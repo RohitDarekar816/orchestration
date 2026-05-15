@@ -109,7 +109,7 @@
           { "text": "Agent <strong>#{{ agent_id }}</strong> — status: <strong>{{ status }}</strong>.", "speech": "Agent {{ agent_id }}, status {{ status }}." }
         ],
         "result": [
-          { "text": "{{ logs }}", "speech": "Here's what the agent found." }
+          { "text": "{{ files_html }}{{ logs }}", "speech": "Here's what the agent found." }
         ],
         "error": [
           { "text": "Sorry, I couldn't launch the agent: {{ message }}", "speech": "Sorry, I couldn't launch the agent." }
