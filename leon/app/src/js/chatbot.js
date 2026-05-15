@@ -1,8 +1,9 @@
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import axios from 'axios'
+import { marked } from 'marked'
 
-import { WidgetWrapper, Flexbox, Loader, Text } from '@aurora'
+import { WidgetWrapper, Flexbox, Loader, Text, Markdown } from '@aurora'
 
 import renderAuroraComponent from './render-aurora-component'
 import ToolUIHandler from './tool-ui-handler'
@@ -443,10 +444,9 @@ export default class Chatbot {
     const originalString = string
     const formattedString = this.formatMessage(string)
     const widgetPayload = this.getWidgetPayload(formattedString)
-    const autoPlanInsertionPoint = this.getPlanWidgetInsertionPoint(widgetPayload)
+    const autoPlanInsertionPoint =
+      this.getPlanWidgetInsertionPoint(widgetPayload)
     const resolvedBeforeElement = beforeElement || autoPlanInsertionPoint
-
-    bubble.innerHTML = formattedString
 
     if (bubbleId) {
       container.classList.add(bubbleId)
@@ -458,6 +458,19 @@ export default class Chatbot {
       this.feed.appendChild(container)
     }
     container.appendChild(bubble)
+
+    const isWidget =
+      formattedString.includes &&
+      formattedString.includes('"component":"WidgetWrapper"')
+
+    // Always use Markdown renderer for non-widget leon messages, 
+    // and for 'me' messages too if desired.
+    const root = createRoot(bubble)
+    if (!isWidget) {
+      root.render(createElement(Markdown, { content: originalString }))
+    } else {
+      bubble.innerHTML = formattedString
+    }
 
     if (who === 'leon' && metrics) {
       container.appendChild(this.createMetricsElement(metrics, sentAt))
@@ -658,12 +671,10 @@ export default class Chatbot {
       message.includes && message.includes('"component":"WidgetWrapper"')
 
     if (typeof message === 'string' && !isWidget) {
-      message = escapeHTML(message)
-      message = message.replace(/\n/g, '<br />')
-
-      // Handle HTTP/HTTPS URLs with simple regex
-      message = message.replace(/https?:\/\/[^\s<>"{}|\\^`[\]]+/gi, (match) => {
-        return `<a href="${match}" target="_blank" rel="noopener noreferrer" class="clickable-url" title="Open URL in browser">${match}</a>`
+      // Use marked for markdown parsing
+      message = marked.parse(message, {
+        gfm: true,
+        breaks: true
       })
 
       // Handle file paths with delimiters for exact matching
