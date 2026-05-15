@@ -47,7 +47,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    command: celery -A app.worker.scheduler.celery_app worker --loglevel=info
+    command: celery -A app.worker.scheduler.celery_app worker --loglevel=info --pool=solo
     environment:
       - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
       - REDIS_URL=redis://:oz-dev@redis:6379/0
@@ -150,6 +150,7 @@ services:
       - leon_profile:/root/.leon
       - /var/run/docker.sock:/var/run/docker.sock
       - ../leon/skills/native/oz_skill:/app/leon/skills/native/oz_skill
+      - ../leon/skills/native/is_it_down_skill:/app/leon/skills/native/is_it_down_skill
     depends_on:
       llama-cpp:
         condition: service_healthy

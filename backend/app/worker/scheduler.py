@@ -45,7 +45,7 @@ def evaluate_schedules():
 
 
 async def _evaluate():
-    from app.core.database import async_session
+    from app.core.database import async_session, engine
     from app.services.agent_runner import get_runner
     from app.services.scheduler_service import SchedulerService
 
@@ -56,6 +56,8 @@ async def _evaluate():
         for agent_run in triggered:
             runner = get_runner(agent_run, db)
             await runner.run()
+
+    await engine.dispose()
 
 
 @celery_app.task(name="run_agent")

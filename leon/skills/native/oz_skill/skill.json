@@ -18,6 +18,7 @@
     "For Docker container logs and status → call docker_logs",
     "For deploying a project (git pull, install, restart) → call deploy",
     "For listing registered servers → call list_servers",
+    "For checking if a website is up/down, monitoring website status → call check_website",
     "When a server name is mentioned, pass it as the server argument",
     "DEFAULT RULE: For any infrastructure/sysadmin/DevOps/server query where no other function clearly matches → call launch_agent"
   ],
@@ -185,6 +186,25 @@
         "I need help with something on the server",
         "can you handle a server task for me",
         "help me with an infrastructure issue"
+      ]
+    },
+    "check_website": {
+      "type": "logic",
+      "description": "Check if a website is up/down from server-side. Reports HTTP status code, response time, and any errors. Can optionally check from a specific server (external perspective).",
+      "parameters": {
+        "url": { "type": "string", "description": "The website URL to check (e.g. https://example.com)." },
+        "domain": { "type": "string", "description": "Alternative to url: the domain name to check (e.g. example.com)." },
+        "server": { "type": "string", "description": "Optional server to check FROM (external perspective). Empty means check from this machine." }
+      },
+      "optional_parameters": ["url", "domain", "server"],
+      "utterance_samples": [
+        "check if https://example.com is up",
+        "is my website https://mysite.com down",
+        "monitor https://api.myapp.com/health",
+        "check website status for https://shop.example.com",
+        "is https://blog.example.com reachable",
+        "check https://staging.example.com from the production server",
+        "verify https://app.example.com responds with 200"
       ]
     },
     "list_agents": {
