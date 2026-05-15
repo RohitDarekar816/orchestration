@@ -18,12 +18,13 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:oz-dev@redis:6379/0
       - SECRET_KEY=change-me-in-production
       - OZ_RUNNER=docker
       - OZ_AGENT_NETWORK=host
       - OZ_LLAMACPP_URL=http://localhost:11435/v1
       - OZ_OPENCODE_MODEL=openai/gpt-4o-mini
+      - OZ_GITHUB_TOKEN=${OZ_GITHUB_TOKEN:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -49,7 +50,7 @@ services:
     command: celery -A app.worker.scheduler.celery_app worker --loglevel=info
     environment:
       - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:oz-dev@redis:6379/0
       - SECRET_KEY=change-me-in-production
     depends_on:
       db:
@@ -64,7 +65,7 @@ services:
     command: celery -A app.worker.scheduler.celery_app beat --loglevel=info
     environment:
       - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:oz-dev@redis:6379/0
       - SECRET_KEY=change-me-in-production
     depends_on:
       redis:
@@ -90,8 +91,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
+    command: redis-server --requirepass oz-dev --rename-command SLAVEOF "" --rename-command REPLICAOF "" --rename-command CONFIG ""
 
   llama-cpp:
     build:
@@ -143,6 +145,7 @@ services:
       OZ_PASSWORD: admin123
       OZ_DEFAULT_AGENT_TYPE: opencode
       OZ_DEFAULT_MAX_RUNTIME: "300"
+      OZ_PUBLIC_URL: http://localhost:8090
     volumes:
       - leon_profile:/root/.leon
       - /var/run/docker.sock:/var/run/docker.sock

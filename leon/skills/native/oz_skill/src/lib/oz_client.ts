@@ -132,9 +132,10 @@ async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3, baseDelay = 1
 
 export async function getOzConfig(
   settings: Settings
-): Promise<{ apiUrl: string; email: string | null; password: string | null; authToken: string | null }> {
+): Promise<{ apiUrl: string; publicUrl: string; email: string | null; password: string | null; authToken: string | null }> {
   return {
     apiUrl: ((await settings.get('oz_api_url')) as string) || 'http://localhost:8000/api',
+    publicUrl: ((await settings.get('oz_public_url')) as string) || 'http://localhost:8090',
     authToken: ((await settings.get('oz_auth_token')) as string) || null,
     email: ((await settings.get('oz_email')) as string) || null,
     password: ((await settings.get('oz_password')) as string) || null,

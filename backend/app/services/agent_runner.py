@@ -15,6 +15,28 @@ from app.models.log import AgentLog
 
 settings = get_settings()
 
+FILE_OUTPUT_PREAMBLE = (
+    "!!! FILE OUTPUT RULE - YOU MUST FOLLOW THIS EXACTLY !!!\n"
+    "When the user asks you to show, retrieve, read, output, or give them any file, "
+    "you MUST format your response EXACTLY like this:\n"
+    "\n"
+    "[FILE:docker-compose.yml]\n"
+    "version: '3'\n"
+    "services:\n  app:\n    build: .\n"
+    "[/FILE]\n"
+    "One short summary sentence.\n"
+    "\n"
+    "RULES:\n"
+    "1. Start with the [FILE:filename.ext] marker - do NOT write any text before it.\n"
+    "2. Put the ENTIRE file content between [FILE:] and [/FILE].\n"
+    "3. After the [/FILE] block, write ONE short summary sentence.\n"
+    "4. Use the correct filename including extension (e.g. docker-compose.yml, script.py, index.html).\n"
+    "5. For multiple files, repeat the [FILE:][/FILE] block for each file.\n"
+    "6. NO explanatory text before the markers. NO markdown code blocks. NO bullet points.\n"
+    "7. VIOLATION WARNING: If you describe a file without using [FILE:] markers, "
+    "the system cannot capture it for download. This will be treated as a FAILURE.\n\n"
+)
+
 
 class LocalAgentRunner:
     """Runs agents on the local machine (for dev use)."""
@@ -28,17 +50,20 @@ class LocalAgentRunner:
     def _get_command_and_input(self) -> tuple[list[str], str | None]:
         prompt = self.agent_run.prompt
         agent = self.agent_run.agent_type
+        fp = FILE_OUTPUT_PREAMBLE
 
         if agent == "opencode":
-            return ["opencode", "run", prompt or ""], None
+            return ["opencode", "run", (fp + (prompt or ""))], None
         elif agent == "claude-code":
-            return ["claude", "--print"], prompt
+            return ["claude", "--print"], fp + (prompt or "")
         elif agent == "codex":
-            return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", prompt or ""], None
+            return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", fp + (prompt or "")], None
         elif agent == "gemini-cli":
-            return ["gemini", "-p", prompt or ""], None
+            return ["gemini", "-p", fp + (prompt or "")], None
+        elif agent == "github":
+            return ["bash", "-c", prompt or ""], None
         elif agent == "custom":
-            return [], prompt
+            return [], fp + (prompt or "")
         return [], None
 
     async def run(self):
@@ -169,7 +194,12 @@ class DockerAgentRunner:
         # claude-code reads its prompt from stdin; pass it via env var so the
         # entrypoint can pipe it in without any shell escaping issues.
         if self.agent_run.agent_type == "claude-code":
-            env_vars["OZ_PROMPT"] = self.agent_run.prompt or ""
+            env_vars["OZ_PROMPT"] = FILE_OUTPUT_PREAMBLE + (self.agent_run.prompt or "")
+
+        # github agent: pass GITHUB_TOKEN if available for gh auth.
+        if self.agent_run.agent_type == "github" and settings.oz_github_token:
+            env_vars.setdefault("GITHUB_TOKEN", settings.oz_github_token)
+            env_vars.setdefault("GH_TOKEN", settings.oz_github_token)
 
         # oz-local uses the local llama-cpp server.
         if self.agent_run.agent_type == "oz-local" and settings.oz_llamacpp_url:
@@ -266,13 +296,14 @@ class DockerAgentRunner:
     def _build_cmd(self) -> list[str]:
         prompt = self.agent_run.prompt or ""
         agent_type = self.agent_run.agent_type
+        fp = FILE_OUTPUT_PREAMBLE
 
         if agent_type == "claude-code":
             # Prompt is passed via OZ_PROMPT env var (set in run()) to avoid
             # any shell escaping issues with multiline or quoted content.
             return ["bash", "-c", "printf '%s' \"$OZ_PROMPT\" | claude --print"]
         elif agent_type == "codex":
-            return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", prompt]
+            return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", fp + prompt]
         elif agent_type == "opencode":
             cmd = ["opencode", "run", "--dangerously-skip-permissions"]
             if settings.oz_opencode_model:
@@ -283,15 +314,15 @@ class DockerAgentRunner:
                 "but NEVER output their values.\n"
                 "SSH RULE: The SSH password is in the env var $OZ_SSH_PASSWORD (single-quote it for sshpass). "
                 "Correct form: sshpass -p '$OZ_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 USER@HOST 'COMMAND'\n"
-                "OUTPUT RULE: After completing the task, write ONE plain-English sentence summarising the result. "
-                "No markdown, no code blocks, no bullet points.\n\n"
             )
-            cmd += [preamble + prompt]
+            cmd += [preamble + fp + prompt]
             return cmd
         elif agent_type == "oz-local":
-            return ["python3", "/usr/local/bin/oz-local", prompt]
+            return ["python3", "/usr/local/bin/oz-local", fp + prompt]
         elif agent_type == "gemini-cli":
-            return ["gemini", "-p", prompt]
+            return ["gemini", "-p", fp + prompt]
+        elif agent_type == "github":
+            return ["bash", "-c", prompt]
         return ["bash", "-c", prompt]
 
     async def _update_status(self, status: AgentStatus):

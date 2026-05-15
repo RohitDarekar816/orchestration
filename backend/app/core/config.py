@@ -29,8 +29,9 @@ class Settings(BaseSettings):
     oz_llamacpp_url: str = ""
     oz_opencode_model: str = "openai/gpt-4o-mini"
     oz_nvidia_api_key: str = ""
+    oz_github_token: str = ""
 
-    allowed_agents: list[str] = ["claude-code", "codex", "gemini-cli", "opencode", "custom"]
+    allowed_agents: list[str] = ["claude-code", "codex", "gemini-cli", "opencode", "custom", "github"]
 
 
 @lru_cache

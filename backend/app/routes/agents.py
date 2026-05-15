@@ -11,6 +11,7 @@ from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.core.ws_manager import active_sessions
 from app.models.agent import AgentRun, AgentStatus
+from app.models.agent_file import AgentFile
 from app.models.log import AgentLog
 from app.models.user import User
 from app.services.agent_runner import get_runner
@@ -50,7 +51,7 @@ async def launch_agent(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if req.agent_type not in ("claude-code", "codex", "gemini-cli", "opencode", "oz-local", "custom"):
+    if req.agent_type not in ("claude-code", "codex", "gemini-cli", "opencode", "oz-local", "custom", "github"):
         raise HTTPException(status_code=400, detail=f"Unsupported agent: {req.agent_type}")
 
     prompt = req.prompt
@@ -280,6 +281,94 @@ async def agent_ws(websocket: WebSocket, agent_id: int):
         active_sessions.pop(agent_id, None)
     except Exception:
         active_sessions.pop(agent_id, None)
+
+
+@router.post("/{agent_id}/files")
+async def upload_agent_files(
+    agent_id: int,
+    files: list[dict],
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+
+    saved = []
+    for f in files:
+        af = AgentFile(
+            agent_run_id=agent_id,
+            filename=f.get("filename", "unnamed"),
+            content=f.get("content", ""),
+            size=len(f.get("content", "")),
+            mime_type=f.get("mime_type", "text/plain"),
+        )
+        db.add(af)
+        saved.append(af)
+    await db.commit()
+
+    return {
+        "uploaded": len(saved),
+        "files": [
+            {"id": af.id, "filename": af.filename, "size": af.size, "mime_type": af.mime_type}
+            for af in saved
+        ],
+    }
+
+
+@router.get("/{agent_id}/files")
+async def list_agent_files(
+    agent_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Agent run not found")
+
+    files_result = await db.execute(
+        select(AgentFile).where(AgentFile.agent_run_id == agent_id).order_by(AgentFile.created_at)
+    )
+    files = files_result.scalars().all()
+
+    return [
+        {
+            "id": f.id,
+            "filename": f.filename,
+            "size": f.size,
+            "mime_type": f.mime_type,
+            "created_at": _dt(f.created_at),
+        }
+        for f in files
+    ]
+
+
+@router.get("/{agent_id}/files/{file_id}")
+async def download_agent_file(
+    agent_id: int,
+    file_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(AgentRun).where(AgentRun.id == agent_id, AgentRun.user_id == user.id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Agent run not found")
+
+    file_result = await db.execute(
+        select(AgentFile).where(AgentFile.id == file_id, AgentFile.agent_run_id == agent_id)
+    )
+    af = file_result.scalar_one_or_none()
+    if not af:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse(
+        content=af.content or "",
+        media_type=af.mime_type or "text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{af.filename}"'},
+    )
 
 
 async def _run_agent_in_background(agent_id: int, _db: AsyncSession, _max_auto_retries: int = 2):

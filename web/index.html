@@ -410,8 +410,11 @@ async function showAgentDetail(id) {
   const el = document.getElementById('page-content');
   el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
   try {
-    const agent = await api('GET', `/agents/${id}`);
-    const logs = await api('GET', `/agents/${id}/logs`);
+    const [agent, logs, files] = await Promise.all([
+      api('GET', `/agents/${id}`),
+      api('GET', `/agents/${id}/logs`),
+      api('GET', `/agents/${id}/files`).catch(() => []),
+    ]);
     el.innerHTML = `
       <div class="flex items-center gap-3 mb-6">
         <a href="#" onclick="showPage('agents')" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">&larr; Back</a>
@@ -436,6 +439,21 @@ async function showAgentDetail(id) {
         <div class="text-sm text-gray-500 dark:text-gray-400 mb-2">Prompt</div>
         <pre class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${escapeHtml(agent.prompt)}</pre>
       </div>` : ''}
+      ${files.length > 0 ? `
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 font-medium text-gray-700 dark:text-gray-300">Files (${files.length})</div>
+        <div class="divide-y divide-gray-100 dark:divide-gray-700">
+          ${files.map(f => `
+            <div class="px-4 py-3 flex items-center justify-between">
+              <span class="text-sm font-mono text-gray-800 dark:text-gray-200">${escapeHtml(f.filename)}</span>
+              <div class="flex gap-2">
+                <button onclick="viewAgentFile(${id}, ${f.id}, '${escapeHtml(f.filename)}')" class="text-xs px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/50">View</button>
+                <a href="/api/agents/${id}/files/${f.id}" download class="text-xs px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded hover:bg-green-100 dark:hover:bg-green-900/50">Download</a>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
       <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 font-medium text-gray-700 dark:text-gray-300">Logs</div>
         <div id="log-container" class="p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed bg-gray-900 dark:bg-black text-green-400 dark:text-green-400 rounded-b-xl">
@@ -447,6 +465,27 @@ async function showAgentDetail(id) {
   } catch (e) {
     el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
   }
+}
+
+function viewAgentFile(agentId, fileId, filename) {
+  const overlay = document.getElementById('file-viewer-overlay');
+  const content = document.getElementById('file-viewer-content');
+  const title = document.getElementById('file-viewer-title');
+  title.textContent = filename;
+  content.textContent = 'Loading...';
+  overlay.classList.remove('hidden');
+  fetch(`/api/agents/${agentId}/files/${fileId}`)
+    .then(r => r.text())
+    .then(text => {
+      content.textContent = text;
+    })
+    .catch(e => {
+      content.textContent = `Error loading file: ${e.message}`;
+    });
+}
+
+function closeFileViewer() {
+  document.getElementById('file-viewer-overlay').classList.add('hidden');
 }
 
 function connectWs(agentId) {
@@ -502,6 +541,7 @@ async function renderLaunch() {
           <option value="claude-code">Claude Code</option>
           <option value="codex">Codex CLI</option>
           <option value="gemini-cli">Gemini CLI</option>
+          <option value="github">GitHub Agent</option>
           <option value="custom">Custom</option>
         </select>
       </div>
@@ -1042,5 +1082,17 @@ function escapeHtml(str) {
 // --- Start ---
 render();
 </script>
+
+<!-- File Viewer Modal -->
+<div id="file-viewer-overlay" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="closeFileViewer()">
+  <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl dark:shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col overflow-hidden" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <h3 id="file-viewer-title" class="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 truncate"></h3>
+      <button onclick="closeFileViewer()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+    </div>
+    <pre id="file-viewer-content" class="flex-1 p-6 overflow-y-auto text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all"></pre>
+  </div>
+</div>
+
 </body>
 </html>
