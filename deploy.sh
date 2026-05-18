@@ -38,7 +38,8 @@ check_env() {
 # ── Build ─────────────────────────────────────────────────────────────────────
 build_images() {
     info "Building images (this may take a few minutes)..."
-    docker compose -f "$DOCKER_DIR/docker-compose.yml" build
+    # Build core services only; skip leon which may fail to build in CI environments
+    docker compose -f "$DOCKER_DIR/docker-compose.yml" build api web worker beat db redis llama-cpp
     info "Building oz-agent image..."
     docker compose -f "$DOCKER_DIR/docker-compose.yml" --profile build build oz-agent
     info "Build complete."
@@ -46,8 +47,9 @@ build_images() {
 
 # ── Start ─────────────────────────────────────────────────────────────────────
 start_services() {
-    info "Starting services..."
-    docker compose -f "$DOCKER_DIR/docker-compose.yml" up -d
+    info "Starting core services..."
+    # Start only core services to avoid building heavy optional services like leon
+    docker compose -f "$DOCKER_DIR/docker-compose.yml" up -d api web worker beat db redis llama-cpp
     info "Waiting for API to be healthy..."
     for i in $(seq 1 30); do
         if docker compose -f "$DOCKER_DIR/docker-compose.yml" exec -T api \
