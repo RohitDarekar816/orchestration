@@ -167,6 +167,22 @@
         ]
       }
     },
+    "check_website": {
+      "answers": {
+        "checking": [
+          { "text": "Checking <strong>{{ url }}</strong> from <strong>{{ server }}</strong>. One moment...", "speech": "Checking website status. One moment." }
+        ],
+        "still_working": [
+          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
+        ],
+        "result": [
+          { "text": "{{ logs }}", "speech": "Here is the website status." }
+        ],
+        "error": [
+          { "text": "Failed to check website: {{ message }}", "speech": "Failed to check website." }
+        ]
+      }
+    },
     "list_servers": {
       "answers": {
         "no_servers": [

@@ -277,7 +277,8 @@ export class LogicActionSkillHandler {
             SOCKET_SERVER.emitAnswerToChatClients(answerData)
           } else {
             const shouldSkipParaphrase =
-              skillAnswer.output.codes.includes('error')
+              skillAnswer.output.codes.includes('error') ||
+              (answerText && /<[a-z]+[\s>]/i.test(answerText))
             const queuedAnswer =
               typeof answer === 'string'
                 ? {

@@ -309,8 +309,12 @@ async function syncLLMSetupChoice(preferences) {
     await setupNodejsBridgeEnv()
     currentStep = 'setupPythonBridgeEnv'
     await setupPythonBridgeEnv()
-    currentStep = 'setupTCPServerEnv'
-    await setupTCPServerEnv()
+    if (preferences.setupVoice) {
+      currentStep = 'setupTCPServerEnv'
+      await setupTCPServerEnv()
+    } else {
+      SetupUI.info('Skipping TCP server setup because voice is disabled')
+    }
     currentStep = 'setupToolsDependencies'
     await setupToolsDependencies()
     currentStep = 'setupToolsSettings'

@@ -1,0 +1,57 @@
+.aurora-markdown
+  width: 100%
+  font-family: var(--font-family)
+  
+  &__part
+    color: var(--white-color)
+    font-size: 1.8rem
+    line-height: 2.4rem
+
+    p
+      margin: 8px 0
+
+      &:first-child
+        margin-top: 0
+      
+      &:last-child
+        margin-bottom: 0
+
+    a
+      color: var(--blue-color)
+      text-decoration: none
+      
+      &:hover
+        text-decoration: underline
+
+    ul, ol
+      margin: 12px 0
+      padding-left: 24px
+
+    li
+      margin: 4px 0
+
+    blockquote
+      margin: 16px 0
+      padding: 8px 16px
+      border-left: 4px solid var(--grey-color)
+      background: rgba(255, 255, 255, 0.03)
+      color: rgba(255, 255, 255, 0.7)
+
+    h1, h2, h3, h4, h5, h6
+      margin: 16px 0 8px 0
+      font-weight: 600
+      color: var(--white-color)
+
+    h1
+      font-size: 2.4rem
+    h2
+      font-size: 2.2rem
+    h3
+      font-size: 2.0rem
+
+    code:not([class*="language-"])
+      background: rgba(255, 255, 255, 0.1)
+      padding: 2px 6px
+      border-radius: 4px
+      font-family: monospace
+      font-size: 0.9em

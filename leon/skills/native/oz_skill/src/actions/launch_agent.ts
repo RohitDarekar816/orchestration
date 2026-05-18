@@ -115,24 +115,23 @@ export const run: ActionFunction = async function (params) {
       /github\.com\/([^/\s]+)\/([^/\s.#?]+)(?:\.git|[\/#?\s]|$)/i
     )
     console.error('[oz-launch] ghMatch:', ghMatch ? `${ghMatch[1]}/${ghMatch[2]}` : 'NO MATCH')
-    if (ghMatch && !_G.ghCard) {
-      const [, owner, repo] = ghMatch
-      const branches = ['master', 'main']
-      const candidates = ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
-      for (const branch of branches) {
-        for (const file of candidates) {
-          const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${file}`
-          console.error('[oz-launch] trying:', rawUrl)
-          try {
-            const resp = await network.request<string>({ url: rawUrl, method: 'GET', responseType: 'text' })
-            console.error('[oz-launch] response status:', resp.statusCode, 'length:', resp.data ? resp.data.length : 0)
-            if (resp.data && resp.data.length > 10) {
-              const content = resp.data
-              const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-              const ext = file.includes('.') ? file.split('.').pop()!.toUpperCase() : 'FILE'
-              const sizeLabel = content.length > 1024 ? `${(content.length / 1024).toFixed(1)} KB` : `${content.length} B`
-              const copyId = `cpy-gh-${owner}-${repo}-${branch}`
-              _G.ghCard = `<div style="margin-bottom:8px;"><div style="background:#1e293b;border:1px solid #334155;border-radius:12px;margin:12px 0;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+    if (ghMatch) {
+      if (!_G.ghCard) {
+        const [, owner, repo] = ghMatch
+        const branches = ['master', 'main']
+        const candidates = ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']
+        outer: for (const branch of branches) {
+          for (const file of candidates) {
+            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${file}`
+            try {
+              const resp = await network.request<string>({ url: rawUrl, method: 'GET', responseType: 'text' })
+              if (resp.data && resp.data.length > 10) {
+                const content = resp.data
+                const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                const ext = file.includes('.') ? file.split('.').pop()!.toUpperCase() : 'FILE'
+                const sizeLabel = content.length > 1024 ? `${(content.length / 1024).toFixed(1)} KB` : `${content.length} B`
+                const copyId = `cpy-gh-${owner}-${repo}-${branch}`
+                _G.ghCard = `<div style="margin-bottom:8px;"><div style="background:#1e293b;border:1px solid #334155;border-radius:12px;margin:12px 0;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
   <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:#0f172a;border-bottom:1px solid #334155;">
     <span style="background:#334155;color:#94a3b8;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.5px;">${ext}</span>
     <span style="color:#e2e8f0;font-size:14px;font-weight:600;font-family:monospace;flex:1;">${file}</span>
@@ -145,31 +144,36 @@ export const run: ActionFunction = async function (params) {
     <a href="${rawUrl}" target="_blank" rel="noopener noreferrer" style="cursor:pointer;background:#1d4ed8;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-family:sans-serif;text-decoration:none;display:inline-block;">Download</a>
   </div>
 </div></div>`
-              continue
+                break outer
+              }
+            } catch {
+              // File not found on this branch — try next candidate.
             }
-          } catch {
-            // File not found on this branch — try next candidate.
           }
         }
       }
+
+      // If a GitHub file card exists (fetched this invocation or a prior one
+      // within the same request), return immediately — no agent needed.
+      if (_G.ghCard) {
+        await leon.answer({ key: 'result', data: { files_html: _G.ghCard, logs: 'Found file from GitHub.', files: [] } })
+        return
+      }
     }
 
-    // If a GitHub file card exists, return immediately (no agent needed).
-    if (_G.ghCard) {
-      await leon.answer({ key: 'result', data: { files_html: _G.ghCard, logs: 'Found file from GitHub.', files: [] } })
-      return
-    }
-
-    let server = serverName ? await resolveServerByName(serverName, cfg.apiUrl, token, network) : null
-    if (serverName && !server) {
-      await leon.answer({
-        key: 'error',
-        data: { message: `Server '${serverName}' not found in Oz. Register it at /api/servers first.` },
-      })
-      return
-    }
-    if (!server) {
-      server = await findServerInUtterance(prompt, cfg.apiUrl, token, network)
+    // Prefer server detected from the user's actual utterance over the LLM's
+    // action_arguments.server. This prevents conversation history contamination
+    // (e.g. stale "AIT5252" references leaking into unrelated follow-up queries).
+    let server = await findServerInUtterance(params.utterance, cfg.apiUrl, token, network)
+    if (!server && serverName) {
+      server = await resolveServerByName(serverName, cfg.apiUrl, token, network)
+      if (!server) {
+        await leon.answer({
+          key: 'error',
+          data: { message: `Server '${serverName}' not found in Oz. Register it at /api/servers first.` },
+        })
+        return
+      }
     }
 
     await leon.answer({ key: 'launching' })

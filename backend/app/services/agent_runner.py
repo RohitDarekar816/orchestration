@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import traceback
 from datetime import datetime, timezone
 
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.ws_manager import active_sessions
 from app.models.agent import AgentRun, AgentStatus
+from app.models.agent_command_audit import AgentCommandAudit
 from app.models.log import AgentLog
 
 settings = get_settings()
@@ -36,6 +38,47 @@ FILE_OUTPUT_PREAMBLE = (
     "7. VIOLATION WARNING: If you describe a file without using [FILE:] markers, "
     "the system cannot capture it for download. This will be treated as a FAILURE.\n\n"
 )
+
+
+_SSH_INVOCATION_RE = re.compile(
+    r"(?:"
+    r"ssh\s+.*\S+@\S+"                 # ssh ... user@host (any args)
+    r"|"
+    r"sshpass\s+.*\bssh\b"             # sshpass ... ssh
+    r"|"
+    r"scp\s+.*\S+:\S"                  # scp ... host:path
+    r"|"
+    r"rsync\s+.*\S+:"                   # rsync ... host:
+    r")",
+)
+
+
+def extract_ssh_commands_from_logs(logs: list[AgentLog]) -> list[AgentCommandAudit]:
+    audits: list[AgentCommandAudit] = []
+    i = 0
+    while i < len(logs):
+        content = logs[i].content
+        if _SSH_INVOCATION_RE.search(content):
+            cmd = content.strip()[:2000]
+            output_parts: list[str] = []
+            j = i + 1
+            while j < len(logs):
+                if _SSH_INVOCATION_RE.search(logs[j].content):
+                    break
+                output_parts.append(logs[j].content)
+                j += 1
+            output = "\n".join(output_parts)[:5000] if output_parts else None
+            audits.append(
+                AgentCommandAudit(
+                    agent_run_id=logs[i].agent_run_id,
+                    command=cmd,
+                    output=output,
+                )
+            )
+            i = j
+        else:
+            i += 1
+    return audits
 
 
 class LocalAgentRunner:
@@ -274,9 +317,12 @@ class DockerAgentRunner:
             self.agent_run.finished_at = datetime.now(timezone.utc)
             await self.db.commit()
 
-        except Exception as e:
-            import traceback
+            try:
+                await self._extract_and_store_ssh_commands()
+            except Exception as audit_e:
+                await self._log("error", f"ssh-audit: {type(audit_e).__name__}: {audit_e}")
 
+        except Exception as e:
             await self._log("error", f"{type(e).__name__}: {e}")
             for line in traceback.format_exc().splitlines():
                 await self._log("error", line)
@@ -347,6 +393,19 @@ class DockerAgentRunner:
                 await ws.send_json({"stream": stream, "content": content, "timestamp": ts})
             except Exception:
                 active_sessions.pop(self.agent_run.id, None)
+
+    async def _extract_and_store_ssh_commands(self):
+        result = await self.db.execute(
+            select(AgentLog).where(
+                AgentLog.agent_run_id == self.agent_run.id
+            ).order_by(AgentLog.timestamp)
+        )
+        logs = result.scalars().all()
+        audits = extract_ssh_commands_from_logs(logs)
+        for a in audits:
+            self.db.add(a)
+        if audits:
+            await self.db.commit()
 
     async def cancel(self):
         if self.container:

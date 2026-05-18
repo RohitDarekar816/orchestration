@@ -13,13 +13,7 @@
   "actions": {
     "run": {
       "type": "logic",
-      "description": "Check whether a website or domain name is reachable.",
-      "parameters": {
-        "domain": {
-          "type": "string",
-          "description": "The website domain or URL to test, for example github.com."
-        }
-      }
+      "description": "Check whether a website or domain name is reachable."
     }
   }
 }
