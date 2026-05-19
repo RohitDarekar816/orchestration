@@ -24,18 +24,18 @@ export function Markdown({ content }: MarkdownProps): React.JSX.Element {
     token: Token,
     index: number
   ): React.JSX.Element | null => {
-    // Robust detection: Look for YAML or Docker Compose markers in text blocks
-    const isCodeLike = /^(version|services|container_name|build|ports|links|image|volumes):/m.test(token.text) || 
-                       /^\s*-?\s*(container_name|image|build|ports|volumes|links):/m.test(token.text);
-
-    if (token.type === 'text' && isCodeLike) {
-      return (
-        <CodeCard
-          key={`markdown-code-${index}`}
-          code={token.text}
-          language="yaml"
-        />
-      )
+    if (token.type === 'text') {
+      const isCodeLike = /^(version|services|container_name|build|ports|links|image|volumes):/m.test(token.text) || 
+                         /^\s*-?\s*(container_name|image|build|ports|volumes|links):/m.test(token.text);
+      if (isCodeLike) {
+        return (
+          <CodeCard
+            key={`markdown-code-${index}`}
+            code={token.text}
+            language="yaml"
+          />
+        )
+      }
     }
 
     if (token.type === 'code') {
@@ -48,11 +48,8 @@ export function Markdown({ content }: MarkdownProps): React.JSX.Element {
       )
     }
 
-    // For other tokens, we use dangerouslySetInnerHTML on a div
-    // We wrap it in the parser to get the HTML string for this specific token
     const html = marked.parser([token])
 
-    // Post-process HTML for Leon-specific markers like [FILE_PATH]
     const processedHtml = html.replace(
       /\[FILE_PATH\](.*?)\[\/FILE_PATH\]/g,
       (_match, filePath) => {
