@@ -244,18 +244,25 @@ class DockerAgentRunner:
             env_vars.setdefault("GITHUB_TOKEN", settings.oz_github_token)
             env_vars.setdefault("GH_TOKEN", settings.oz_github_token)
 
-        # oz-local uses the local llama-cpp server.
-        if self.agent_run.agent_type == "oz-local" and settings.oz_llamacpp_url:
-            env_vars.setdefault("OPENAI_BASE_URL", settings.oz_llamacpp_url)
-            env_vars.setdefault("OPENAI_API_KEY", "sk-local")
+        # oz-local: prefer OpenRouter when available, else fall back to local llama-cpp.
+        if self.agent_run.agent_type == "oz-local":
+            if os.environ.get("OPENROUTER_API_KEY"):
+                env_vars.setdefault("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+                env_vars.setdefault("OPENAI_API_KEY", os.environ["OPENROUTER_API_KEY"])
+                env_vars.setdefault("OZ_LOCAL_MODEL", "meta-llama/llama-3.1-8b-instruct")
+            elif settings.oz_llamacpp_url:
+                env_vars.setdefault("OPENAI_BASE_URL", settings.oz_llamacpp_url)
+                env_vars.setdefault("OPENAI_API_KEY", "sk-local")
 
-        # opencode: free opencode/* models need no credentials.
-        # Inject NVIDIA key only if the model requires it.
+        # opencode: route models to the right provider.
         if self.agent_run.agent_type == "opencode":
             model = settings.oz_opencode_model or ""
             if not model.startswith("opencode/"):
                 if settings.oz_nvidia_api_key:
                     env_vars.setdefault("NVIDIA_API_KEY", settings.oz_nvidia_api_key)
+                elif os.environ.get("OPENROUTER_API_KEY"):
+                    env_vars.setdefault("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+                    env_vars.setdefault("OPENAI_API_KEY", os.environ["OPENROUTER_API_KEY"])
                 elif settings.oz_llamacpp_url:
                     env_vars.setdefault("OPENAI_BASE_URL", settings.oz_llamacpp_url)
                     env_vars.setdefault("OPENAI_API_KEY", "sk-local")

@@ -75,9 +75,6 @@ After showing the logs, summarise:
       serverId: server?.id ?? null,
       maxRuntime: 300,
       maxPollSeconds: 360,
-      onProgress: async (message) => {
-        await leon.answer({ key: 'still_working', data: { message } })
-      },
     })
 
     await leon.answer({

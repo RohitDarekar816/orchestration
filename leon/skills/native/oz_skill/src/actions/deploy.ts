@@ -96,9 +96,6 @@ Print a clear DEPLOYMENT SUMMARY at the end: succeeded or failed, what changed, 
       serverId: server?.id ?? null,
       maxRuntime: 600,
       maxPollSeconds: 720,
-      onProgress: async (message) => {
-        await leon.answer({ key: 'still_working', data: { message } })
-      },
     })
 
     await leon.answer({

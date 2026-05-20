@@ -19,7 +19,7 @@ export const run: ActionFunction = async function (params) {
   const container = (params.action_arguments?.container as string) || (params.action_arguments?.name as string) || ''
   const lines = Number(params.action_arguments?.lines) || 100
   const grep = (params.action_arguments?.grep as string) || (params.action_arguments?.filter as string) || ''
-  const agentType = ((await settings.get('default_agent_type')) as string) || 'oz-local'
+  const agentType = 'oz-local'
 
   try {
     const cfg = await getOzConfig(settings)
@@ -63,7 +63,10 @@ Summarise: is the container healthy? Any errors or crash-loops visible?`
 1. List all containers and their status:
    \`docker ps -a --format "table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}" 2>&1\`
 
-2. Show last ${lines} lines from any containers that are stopped or restarting:
+2. Count running containers:
+   \`docker ps -q | wc -l 2>&1\`
+
+3. Show last ${lines} lines from any containers that are stopped or restarting:
    For each unhealthy container, run: \`docker logs --tail 20 <container_name> 2>&1\`
 
 Summarise overall Docker health: running vs stopped containers, any crash-loops.`
@@ -77,9 +80,6 @@ Summarise overall Docker health: running vs stopped containers, any crash-loops.
       serverId: server?.id ?? null,
       maxRuntime: 300,
       maxPollSeconds: 360,
-      onProgress: async (message) => {
-        await leon.answer({ key: 'still_working', data: { message } })
-      },
     })
 
     await leon.answer({

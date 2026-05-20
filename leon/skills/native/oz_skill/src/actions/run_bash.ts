@@ -62,11 +62,8 @@ ${command}`
       agentType,
       prompt,
       serverId: server?.id ?? null,
-      maxRuntime,
-      maxPollSeconds: maxRuntime + 60,
-      onProgress: async (message) => {
-        await leon.answer({ key: 'still_working', data: { message } })
-      },
+      maxRuntime: 120,
+      maxPollSeconds: 180,
     })
 
     await leon.answer({

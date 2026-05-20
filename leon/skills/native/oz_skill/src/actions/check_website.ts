@@ -71,9 +71,6 @@ If the curl command fails entirely, report the site as DOWN with the error messa
       serverId: server?.id ?? null,
       maxRuntime: 120,
       maxPollSeconds: 180,
-      onProgress: async (message) => {
-        await leon.answer({ key: 'still_working', data: { message } })
-      },
     })
 
     await leon.answer({

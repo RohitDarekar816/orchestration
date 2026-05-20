@@ -40,7 +40,6 @@ Check and report the system health in this order:
 3. Disk: run \`df -h --output=source,fstype,size,used,avail,pcent,target | grep -v tmpfs | grep -v devtmpfs\`
 4. Top 5 processes by CPU: run \`ps aux --sort=-%cpu | head -6\`
 5. Failed systemd services (if systemd available): run \`systemctl --failed --no-pager 2>/dev/null || echo "systemd not available"\`
-6. Docker container status (if Docker available): run \`docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}" 2>/dev/null || echo "Docker not available"\`
 
 Print each section with a clear header. Flag any obvious problems (disk > 80%, failed services, high load).`
 
@@ -53,9 +52,6 @@ Print each section with a clear header. Flag any obvious problems (disk > 80%, f
       serverId: server?.id ?? null,
       maxRuntime: 300,
       maxPollSeconds: 360,
-      onProgress: async (message) => {
-        await leon.answer({ key: 'still_working', data: { message } })
-      },
     })
 
     await leon.answer({

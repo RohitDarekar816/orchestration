@@ -25,6 +25,7 @@ services:
       - OZ_LLAMACPP_URL=http://localhost:11435/v1
       - OZ_OPENCODE_MODEL=openai/gpt-4o-mini
       - OZ_GITHUB_TOKEN=${OZ_GITHUB_TOKEN:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:

@@ -447,28 +447,32 @@ Rules:
               ? completionResult.output
               : JSON.stringify(completionResult.output)
           const tmpResponse = JSON.parse(rawOutput)
-          let parsedOutput: ActionCallingOutput = {
-            status: ActionCallingStatus.NotFound
-          }
+          const responses = Array.isArray(tmpResponse) ? tmpResponse : [tmpResponse]
 
-          if (tmpResponse.status === ActionCallingStatus.MissingParams) {
-            parsedOutput = {
-              status: ActionCallingStatus.MissingParams,
-              required_params: tmpResponse.required_params || [],
-              name: tmpResponse.name || '',
-              arguments: tmpResponse.arguments || {}
+          for (const item of responses) {
+            let parsedOutput: ActionCallingOutput = {
+              status: ActionCallingStatus.NotFound
             }
-          } else if (tmpResponse.name) {
-            parsedOutput = {
-              status: ActionCallingStatus.Success,
-              name: tmpResponse.name,
-              arguments: tmpResponse.arguments || {}
-            }
-          }
 
-          dutyOutput.push(
-            this.parseOptionalParameters(skillConfig, parsedOutput)
-          )
+            if (item.status === ActionCallingStatus.MissingParams) {
+              parsedOutput = {
+                status: ActionCallingStatus.MissingParams,
+                required_params: item.required_params || [],
+                name: item.name || '',
+                arguments: item.arguments || {}
+              }
+            } else if (item.name) {
+              parsedOutput = {
+                status: ActionCallingStatus.Success,
+                name: item.name,
+                arguments: item.arguments || {}
+              }
+            }
+
+            dutyOutput.push(
+              this.parseOptionalParameters(skillConfig, parsedOutput)
+            )
+          }
         } catch {
           dutyOutput.push({
             status: ActionCallingStatus.NotFound

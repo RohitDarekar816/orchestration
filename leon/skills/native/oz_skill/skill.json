@@ -13,12 +13,12 @@
     "CRITICAL: You MUST call the 'launch_agent' function for any infrastructure task that does not clearly match another action. NEVER return 'not_found'.",
     "For greetings, social chat, or non-infrastructure questions → call greet",
     "For quick bash/shell commands → call run_bash",
-    "For server CPU/memory/disk/service status → call server_health",
+    "For server CPU/memory/disk/load → call server_health (NOT for Docker-specific queries)",
     "For application or system log inspection → call app_logs",
-    "For Docker container logs and status → call docker_logs",
+    "For Docker container count, listing containers, container logs, or container status → call docker_logs",
     "For deploying a project (git pull, install, restart) → call deploy",
     "For listing registered servers → call list_servers",
-    "For checking if a website is up/down, monitoring website status → call check_website",
+    "For checking if a website is up/down → call check_website",
     "When a server name is mentioned, pass it as the server argument",
     "DEFAULT RULE: For any infrastructure/sysadmin/DevOps/server query where no other function clearly matches → call launch_agent"
   ],
@@ -61,7 +61,7 @@
     },
     "server_health": {
       "type": "logic",
-      "description": "Check the health of a server: CPU, memory, disk, load average, failed services, and Docker container status.",
+      "description": "Check the health of a server: CPU, memory, disk, load average, and failed services. For Docker-specific status use docker_logs.",
       "parameters": {
         "server": { "type": "string", "description": "Target server name to check health on. Empty means local machine." }
       },
@@ -101,7 +101,7 @@
     },
     "docker_logs": {
       "type": "logic",
-      "description": "Get Docker container logs and status. Can target a specific container or show all containers and their health.",
+      "description": "Get Docker container logs, status, count, and health. Use for counting how many containers are running, listing containers, or checking container-specific logs. For general server health (CPU/memory/disk) use server_health.",
       "parameters": {
         "server": { "type": "string", "description": "Target server name for Docker operations. Empty means local machine." },
         "container": { "type": "string", "description": "Container name to inspect." },

@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,7 @@ from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.user import User
 from app.services.audit_service import AuditService
+from app.services.exec_service import ExecService
 from app.services.server_service import ServerService
 
 router = APIRouter(prefix="/api/servers", tags=["servers"])
@@ -162,3 +163,31 @@ async def delete_server(
     )
 
     return {"message": "Server deleted"}
+
+
+@router.post("/{server_id}/exec")
+async def exec_on_server(
+    server_id: int,
+    command: str = Query(..., description="Shell command to run on the server"),
+    timeout: int = Query(60, description="Command timeout in seconds"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = ServerService(db)
+    server = await svc.get_server(server_id, user.id)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    exec_svc = ExecService(db)
+    result = await exec_svc.exec(server, command, timeout)
+
+    audit = AuditService(db)
+    await audit.log(
+        user_id=user.id,
+        action="server.exec",
+        resource_type="server",
+        resource_id=str(server_id),
+        details=f"Command: {command[:200]}",
+    )
+
+    return result

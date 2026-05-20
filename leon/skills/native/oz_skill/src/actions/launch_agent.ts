@@ -187,9 +187,6 @@ export const run: ActionFunction = async function (params) {
       serverId: server?.id ?? null,
       maxRuntime,
       maxPollSeconds: maxRuntime + 60,
-      onProgress: async (message) => {
-        await leon.answer({ key: 'still_working', data: { message } })
-      },
     })
 
     // Extract file artifacts from agent output and upload them.

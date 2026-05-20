@@ -96,12 +96,13 @@ def main():
                 "When given a task, output ONLY a bash script inside a ```bash code block. "
                 "Do not explain. Do not add prose. Just the code block. "
                 "Use safe, non-destructive commands.\n\n"
-                "SSH RULES — follow exactly:\n"
-                "- If the task gives a password, ALWAYS use: sshpass -p 'PASSWORD' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 USER@HOST 'COMMAND'\n"
-                "- If the task gives no password (uses key auth), use: ssh -o StrictHostKeyChecking=no -i /tmp/oz_ssh_key USER@HOST 'COMMAND'\n"
-                "- Always use SSH port 22 unless the task specifies a different port.\n"
-                "- Wrap the password in single quotes. If the password contains a single quote, escape it as '\\''.\n"
-                "- Run the remote command inline in the ssh call, do not use interactive sessions."
+            "SSH RULES — follow exactly:\n"
+            "- If the env var OZ_SSH_PASSWORD is set, use: sshpass -p \"$OZ_SSH_PASSWORD\" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 USER@HOST 'COMMAND'\n"
+            "- If the env var OZ_SSH_KEY is set (key auth), use: ssh -o StrictHostKeyChecking=no -i /tmp/oz_ssh_key USER@HOST 'COMMAND'\n"
+            "- Always use SSH port from env var OZ_SSH_PORT if set, else 22.\n"
+            "- Use the env vars directly — never print or reveal their values.\n"
+            "- Let the shell expand $OZ_SSH_PASSWORD at runtime — do NOT embed the literal value in the script.\n"
+            "- Run the remote command inline in the ssh call, do not use interactive sessions."
             ),
         },
         {"role": "user", "content": task},
