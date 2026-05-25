@@ -4,6 +4,7 @@ import Chatbot from './chatbot'
 import VoiceEnergy from './voice-energy'
 import { INIT_MESSAGES } from './constants'
 import handleSuggestions from './suggestion-handler.js'
+import { getToken, clearToken } from './auth'
 
 export default class Client {
   constructor(client, serverUrl, input, options = {}) {
@@ -11,7 +12,10 @@ export default class Client {
     this._input = input
     this.voiceSpeechElement = document.querySelector('#voice-speech')
     this.serverUrl = serverUrl
-    this.socket = io(this.serverUrl)
+    const token = getToken()
+    this.socket = io(this.serverUrl, {
+      auth: token ? { token } : undefined
+    })
     this.activeSessionId = options.activeSessionId || null
     this.history = localStorage.getItem('history')
     this.parsedHistory = []
@@ -109,7 +113,7 @@ export default class Client {
     }
 
     const trySendInitMessages = () => {
-      const initializedInitElement = document.querySelector('#init .initialized')
+      const initializedInitElement = document.querySelector('#init.initialized')
 
       if (!initializedInitElement) {
         return false
@@ -154,6 +158,24 @@ export default class Client {
       this.setInitStatus('tcpServerBoot', 'success')
     }
 
+    this.socket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err.message)
+      if (err.message === 'Authentication required' || err.message === 'Invalid or expired token') {
+        this.socket.disconnect()
+        clearToken()
+        window.location.reload()
+      }
+    })
+
+    if (this.socket.connected) {
+      this.socket.emit('init', {
+        client: this.client,
+        sessionId: this.activeSessionId,
+        capabilities: {
+          supportsWidgets: true
+        }
+      })
+    }
     this.socket.on('connect', () => {
       this.socket.emit('init', {
         client: this.client,

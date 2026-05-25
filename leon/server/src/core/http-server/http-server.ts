@@ -29,6 +29,7 @@ import { sessionsPlugin } from '@/core/http-server/api/sessions'
 import { keyMidd } from '@/core/http-server/plugins/key'
 import { utterancePlugin } from '@/core/http-server/api/utterance'
 import { openPathPlugin } from '@/core/http-server/api/open-path'
+import { authPlugin } from '@/core/http-server/api/auth'
 import { fileSystemListPlugin } from '@/core/http-server/api/file-system-list'
 import { PERSONA } from '@/core'
 import { SystemHelper } from '@/helpers/system-helper'
@@ -173,6 +174,7 @@ export default class HTTPServer {
       reply.sendFile('index.html')
     })
 
+    this.fastify.register(authPlugin, { apiVersion: API_VERSION })
     this.fastify.register(runActionPlugin, { apiVersion: API_VERSION })
     this.fastify.register(fetchWidgetPlugin, { apiVersion: API_VERSION })
     this.fastify.register(conversationHistoryPlugin, {

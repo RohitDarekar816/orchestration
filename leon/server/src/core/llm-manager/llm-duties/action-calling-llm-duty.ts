@@ -15,7 +15,6 @@ import {
 import { SkillDomainHelper } from '@/helpers/skill-domain-helper'
 import { LogHelper } from '@/helpers/log-helper'
 import type { MessageLog } from '@/types'
-
 interface ActionCallingWorkflowContext {
   recentUtterances: string[]
   recentActionArguments: Record<string, unknown>[]
@@ -237,6 +236,88 @@ Rules:
     return true
   }
 
+  private routeByPattern(
+    input: string | null,
+    actions: SkillSchema['actions']
+  ): LLMDutyResult | true {
+    const text = input?.toLowerCase().trim() || ''
+    if (!text) {
+      return true
+    }
+
+    interface PatternRoute {
+      pattern: RegExp
+      action: string
+    }
+
+    const routes: PatternRoute[] = [
+      // Greetings
+      { pattern: /^(hello|hi|hey|greetings|good morning|good (evening|afternoon)|howdy|what's up|sup)\b/, action: 'greet' },
+
+      // Website check
+      { pattern: /(check|is) (website|site) (is |)(up|down|reachable|status)/, action: 'check_website' },
+
+      // List servers
+      { pattern: /(list|show) (my |registered |all |available |)servers/, action: 'list_servers' },
+
+      // Agent management
+      { pattern: /(list|recent|show) agent (runs|tasks|history)/, action: 'list_agents' },
+      { pattern: /(cancel|stop|kill) agent/, action: 'cancel_agent' },
+      { pattern: /(status|details|output|check on) agent/, action: 'get_agent' },
+
+      // Quick bash commands
+      { pattern: /(run|execute) (a |)(bash|shell|command|cmd)/, action: 'run_bash' },
+      { pattern: /^(docker ps|df -h|free -m|uptime|netstat|ps aux)/, action: 'run_bash' },
+
+      // Docker container operations
+      { pattern: /(docker|container).*(log|status|count|list|ps|running|health|how many|crash)/, action: 'docker_logs' },
+
+      // Container/image deployment —→ n8n
+      { pattern: /deploy.*(nginx|container|docker|port \d+|image)/, action: 'n8n_agent' },
+
+      // Git-based project deploy
+      { pattern: /deploy.*(project|app|repo|branch|git pull|update code|restart service)/, action: 'deploy' },
+
+      // Server health
+      { pattern: /(check|how (much|many)|what is|show|get|tell).*(ram|memory|cpu|disk|load|storage|resources|free|available).*(server|machine|system)?/, action: 'server_health' },
+      { pattern: /(server|system|machine) (health|status|resources|memory|cpu|disk)/, action: 'server_health' },
+
+      // Log file inspection
+      { pattern: /(fetch|get|show|tail|view|inspect|read) .*(log|logs)/, action: 'app_logs' },
+      { pattern: /(log file|error log|syslog|application log)/, action: 'app_logs' },
+
+      // Infrastructure tasks → n8n (actions, not investigation)
+      { pattern: /\b(setup|configure|install|migrate|backup?|restore|monitor|deploy)\b/, action: 'n8n_agent' },
+
+      // Investigation/troubleshooting → launch agent
+      { pattern: /\b(diagnose|troubleshoot|investigate|debug|analyze|investigate|find out why|why is|why (does|is|are|did))\b/, action: 'launch_agent' },
+
+      // Explicit n8n mention
+      { pattern: /\bn8n\b/, action: 'n8n_agent' },
+    ]
+
+    for (const route of routes) {
+      if (text.match(route.pattern) && actions[route.action]) {
+        LogHelper.title(this.name)
+        LogHelper.success(`Pattern matched: "${route.action}" for input: "${text}"`)
+
+        return {
+          output: JSON.stringify([
+            {
+              status: ActionCallingStatus.Success,
+              name: route.action,
+              arguments: {}
+            }
+          ]),
+          usedInputTokens: 0,
+          usedOutputTokens: 0
+        } as unknown as LLMDutyResult
+      }
+    }
+
+    return true
+  }
+
   private toOpenAIParameterSchema(param: unknown): OpenAIJSONSchema {
     if (!param || typeof param !== 'object' || !('type' in param)) {
       return {
@@ -393,6 +474,19 @@ Rules:
 
       const prompt = this.buildPrompt(actionNotes, preselectedSingleActionName)
       const filteredActions = this.filterActionsWithWorkflow(actions, workflow)
+
+      const patternResult = this.routeByPattern(
+        this.input?.toString() || '',
+        filteredActions
+      )
+      if (patternResult !== true) {
+        LogHelper.title(this.name)
+        LogHelper.success('Duty executed (pattern route matched)')
+        LogHelper.success(`Output — ${(patternResult as LLMDutyResult).output}`)
+
+        return patternResult as LLMDutyResult
+      }
+
       const openAITools = this.actionsToOpenAITools(filteredActions)
       const config = LLM_MANAGER.coreLLMDuties[LLMDuties.ActionCalling]
       const completionResult = await LLM_PROVIDER.prompt(prompt, {

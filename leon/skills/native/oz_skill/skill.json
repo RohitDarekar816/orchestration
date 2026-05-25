@@ -4,23 +4,25 @@
   "icon_name": "terminal-line",
   "bridge": "nodejs",
   "version": "1.1.0",
-  "description": "Oz platform for Linux server administration tasks: running shell commands, checking server health metrics, fetching application or Docker logs, deploying projects, and launching AI agents for infrastructure automation.",
+  "description": "Oz platform for Linux server administration tasks: running shell commands, checking server health metrics, fetching application or Docker logs, deploying projects, launching AI agents for infrastructure automation. Also handles server diagnostics, troubleshooting, debugging, and analysis of why servers or applications are failing or slow.",
   "author": {
     "name": "Oz Team",
     "url": "https://opencode.ai"
   },
   "action_notes": [
-    "CRITICAL: You MUST call the 'launch_agent' function for any infrastructure task that does not clearly match another action. NEVER return 'not_found'.",
     "For greetings, social chat, or non-infrastructure questions → call greet",
     "For quick bash/shell commands → call run_bash",
-    "For server CPU/memory/disk/load → call server_health (NOT for Docker-specific queries)",
+    "For server CPU/memory/disk/load → call server_health",
     "For application or system log inspection → call app_logs",
     "For Docker container count, listing containers, container logs, or container status → call docker_logs",
     "For deploying a project (git pull, install, restart) → call deploy",
     "For listing registered servers → call list_servers",
     "For checking if a website is up/down → call check_website",
     "When a server name is mentioned, pass it as the server argument",
-    "DEFAULT RULE: For any infrastructure/sysadmin/DevOps/server query where no other function clearly matches → call launch_agent"
+    "For operational infrastructure tasks (deploy, configure, install, setup, backup, restore, migrate, monitor) → call n8n_agent",
+    "For investigative/analytical tasks (diagnose, troubleshoot, investigate, debug, analyze, find root cause) → call launch_agent",
+    "If unsure which action fits, evaluate: is the user asking to DO something (operational) or to FIGURE OUT something (investigative)? Operational → n8n_agent. Investigative → launch_agent.",
+    "If the intent is still unclear, call n8n_agent with confirmed=false to ask the user"
   ],
   "actions": {
     "greet": {
@@ -128,7 +130,7 @@
     },
     "deploy": {
       "type": "logic",
-      "description": "Deploy a project on a server: git pull the latest code, install dependencies, build, and restart the service.",
+      "description": "Use ONLY for git-based project deployment: git pull, install dependencies, build, and restart a service. NOT for deploying containers or Docker images — use n8n_agent for that.",
       "parameters": {
         "server": { "type": "string", "description": "Target server name to deploy to. Empty means local machine." },
         "path": { "type": "string", "description": "Project directory path on the server." },
@@ -146,9 +148,31 @@
         "run deployment for /opt/services/backend"
       ]
     },
+    "n8n_agent": {
+      "type": "logic",
+      "description": "Use for operational infrastructure tasks: deployments, configuration, installation, setup, backups, restores, migrations, monitoring, and any other concrete action on servers or containers. Routes the user's request to an external workflow that can execute it. First ask with confirmed=false, then call with confirmed=true if user agrees. For investigative/analytical tasks (diagnose, troubleshoot, debug) use launch_agent instead.",
+      "parameters": {
+        "agent_name": { "type": "string", "description": "The n8n agent name that best matches the user's request (e.g. devops, k8s, backup). Leave empty if unsure." },
+        "task": { "type": "string", "description": "The task or question to send to the n8n agent." },
+        "confirmed": { "type": "boolean", "description": "Set to false to ask the user first. Set to true only if the user already agreed to use n8n." }
+      },
+      "optional_parameters": ["agent_name", "task", "confirmed"],
+      "utterance_samples": [
+        "deploy nginx docker container with custom port 8989",
+        "deploy nginx on port 8989 and give me the container ID",
+        "deploy nginx docker container",
+        "set up a new web server",
+        "install nginx on the production server",
+        "configure monitoring for the api service",
+        "back up the database to S3",
+        "migrate the application to the new server",
+        "restore the backup from yesterday",
+        "ask the devops n8n agent to deploy nginx"
+      ]
+    },
     "launch_agent": {
       "type": "logic",
-      "description": "FALLBACK FUNCTION: Call this function for any infrastructure/server/DevOps/sysadmin task that does not clearly match another action. Handles all server administration, troubleshooting, diagnostics, scripting, automation, configuration, package management, firewall setup, SSL renewal, monitoring, backups, user management, network troubleshooting, deployment, and any other infrastructure task expressed in natural language. When in doubt, call this function.",
+      "description": "Use for investigative/analytical infrastructure tasks: diagnose why something is failing, troubleshoot errors, debug issues, analyze logs or metrics, find root causes, investigate anomalies. For concrete operational tasks (deploy, configure, install, setup, backup, monitor) use n8n_agent instead.",
       "parameters": {
         "prompt": { "type": "string", "description": "The full user request or task description to give to the agent." }
       },
@@ -156,33 +180,14 @@
       "utterance_samples": [
         "investigate why the API is returning 500 errors on prod",
         "analyse the logs and find what is causing slowdowns",
-        "set up a cron job to back up the database daily",
-        "write a script to rotate the application logs",
         "troubleshoot the failing deployment on staging",
         "debug why the service keeps restarting on prod-web",
         "diagnose the database connection issue on the server",
-        "install and configure nginx on the new server",
-        "set up a firewall with ufw on prod-web",
-        "renew SSL certificates on all servers",
-        "add a new user to the staging server",
-        "configure monitoring for the api service",
-        "set up daily database backups to S3",
         "check why the network is slow on the database server",
-        "migrate the application from the old server to the new one",
-        "update all packages and reboot if necessary",
-        "set up a new docker compose stack for the staging environment",
-        "configure fail2ban on the production server",
-        "optimise the postgresql configuration for better performance",
-        "create a systemd service for the custom webhook handler",
-        "add swap space on the app server",
-        "set up logrotate configuration for nginx logs",
-        "configure automatic security updates",
-        "install nodejs and pm2 on the web server",
-        "set up a reverse proxy with nginx for the api",
-        "check the raid status and disk health on all servers",
-        "configure ssh key-based authentication for a new team member",
-        "set up a VPN connection between staging and production",
-        "run any infrastructure or server task",
+        "find out why the backup is failing",
+        "investigate the high memory usage on the web server",
+        "analyse the error logs and tell me what is wrong",
+        "why is the nginx container crashing on production",
         "I need help with something on the server",
         "can you handle a server task for me",
         "help me with an infrastructure issue"

@@ -10,6 +10,34 @@
     </style>
   </head>
   <body class="settingup">
+    <div id="auth-section">
+      <div id="auth-container">
+        <div id="auth-logo">
+          <img src="/img/logo.svg" alt="Leon AI" />
+          <h1>Leon AI</h1>
+        </div>
+        <div id="auth-tabs">
+          <button class="auth-tab active" data-tab="login">Sign In</button>
+          <button class="auth-tab" data-tab="register">Sign Up</button>
+        </div>
+        <form id="auth-form-login" class="auth-form active">
+          <div class="auth-field">
+            <label for="auth-email">Email</label>
+            <input id="auth-email" type="email" placeholder="you@example.com" required />
+          </div>
+          <div class="auth-field">
+            <label for="auth-password">Password</label>
+            <input id="auth-password" type="password" placeholder="••••••••" required />
+          </div>
+          <div id="auth-name-field" class="auth-field hidden">
+            <label for="auth-name">Full Name</label>
+            <input id="auth-name" type="text" placeholder="Your Name" />
+          </div>
+          <div id="auth-error" class="auth-error hidden"></div>
+          <button id="auth-submit" type="submit">Sign In</button>
+        </form>
+      </div>
+    </div>
     <div id="init"></div>
     <div id="voice-overlay-bg">
       <div id="voice-container">

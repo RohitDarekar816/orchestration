@@ -9,7 +9,8 @@ import {
   SHOULD_START_PYTHON_TCP_SERVER,
   IS_DEVELOPMENT_ENV,
   API_VERSION,
-  WEB_APP_DEV_SERVER_PORT
+  WEB_APP_DEV_SERVER_PORT,
+  OZ_API_URL
 } from '@/constants'
 import {
   HTTP_SERVER,
@@ -350,6 +351,24 @@ export default class SocketServer {
           cors: { origin: `${HTTP_SERVER.host}:${WEB_APP_DEV_SERVER_PORT}` }
         })
       : new SocketIOServer(HTTP_SERVER.httpServer)
+
+    if (OZ_API_URL) {
+      io.use(async (socket, next) => {
+        const auth = socket.handshake.auth as Record<string, unknown> | undefined
+        const token = auth?.['token'] as string | undefined
+        if (!token) {
+          return next(new Error('Authentication required'))
+        }
+        try {
+          await axios.get(`${OZ_API_URL}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          next()
+        } catch {
+          next(new Error('Invalid or expired token'))
+        }
+      })
+    }
 
     let sttState = 'disabled'
     let ttsState = 'disabled'

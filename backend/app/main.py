@@ -7,7 +7,7 @@ from app.core.config import get_settings
 from app.core.database import init_db
 from app.models import server as _server_model  # noqa: F401 — ensures table is created
 from app.models import agent_command_audit as _agent_command_audit  # noqa: F401
-from app.routes import agents, auth, chat, dashboard, schedules, secrets, servers, skills
+from app.routes import agents, auth, chat, dashboard, n8n_agents, schedules, secrets, servers, skills
 
 settings = get_settings()
 
@@ -40,6 +40,7 @@ app.include_router(secrets.router)
 app.include_router(servers.router)
 app.include_router(chat.router)
 app.include_router(dashboard.router)
+app.include_router(n8n_agents.router)
 
 
 @app.get("/api/health")

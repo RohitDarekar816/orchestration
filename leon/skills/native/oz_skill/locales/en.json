@@ -195,6 +195,28 @@
           { "text": "Couldn't fetch the server list: {{ message }}", "speech": "Couldn't fetch the server list." }
         ]
       }
+    },
+    "n8n_agent": {
+      "answers": {
+        "n8n_no_agents": [
+          { "text": "No n8n agents are configured. Register one via the Oz API or dashboard.", "speech": "No n8n agents configured." }
+        ],
+        "n8n_ask_which": [
+          { "text": "I found several n8n agents: {{ names }}. Which one should I use?", "speech": "Which n8n agent should I use? Available: {{ names }}." }
+        ],
+        "n8n_ask_confirm": [
+          { "text": "I can use the <strong>{{ agent_name }}</strong> n8n agent for this ({{ description }}). Would you like me to?", "speech": "I can use the {{ agent_name }} n8n agent. Would you like me to?" }
+        ],
+        "n8n_working": [
+          { "text": "Calling the <strong>{{ agent_name }}</strong> n8n agent...", "speech": "Calling the n8n agent. One moment." }
+        ],
+        "n8n_result": [
+          { "text": "{{ result }}", "speech": "{{ result }}" }
+        ],
+        "error": [
+          { "text": "Failed to call n8n agent: {{ message }}", "speech": "Failed to call n8n agent." }
+        ]
+      }
     }
   }
 }

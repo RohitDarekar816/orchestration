@@ -26,9 +26,9 @@ interface CoreLLMDuties {
 type SkillListContent = string | null
 
 const WORKFLOW_SKILL_ROUTER_MAX_TOKENS = 72
-const WORKFLOW_ACTION_CALLING_MAX_TOKENS = 1024
+const WORKFLOW_ACTION_CALLING_MAX_TOKENS = 512
 const WORKFLOW_SLOT_FILLING_MAX_TOKENS = 128
-const WORKFLOW_PARAPHRASE_MAX_TOKENS = 8_192
+const WORKFLOW_PARAPHRASE_MAX_TOKENS = 190
 
 // Workflow duties should stay fast and deterministic. The provider layer maps
 // disableThinking to the strongest supported non-thinking / low-reasoning mode.

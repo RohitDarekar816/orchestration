@@ -9,7 +9,8 @@ import {
   STT_PROVIDER,
   TTS_PROVIDER,
   IS_TELEMETRY_ENABLED,
-  SHOULD_START_PYTHON_TCP_SERVER
+  SHOULD_START_PYTHON_TCP_SERVER,
+  OZ_API_URL
 } from '@/constants'
 import { PERSONA } from '@/core'
 import { LogHelper } from '@/helpers/log-helper'
@@ -102,6 +103,9 @@ export const getInfo: FastifyPluginAsync<APIOptions> = async (
         routingMode,
         tcpServer: {
           enabled: SHOULD_START_PYTHON_TCP_SERVER
+        },
+        auth: {
+          enabled: !!OZ_API_URL
         },
         mood: {
           type: PERSONA.mood.type,

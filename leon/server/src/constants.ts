@@ -476,6 +476,7 @@ export const PYTHON_TCP_SERVER_PORT = Number(
   process.env['LEON_PY_TCP_SERVER_PORT']
 )
 
+export const OZ_API_URL = process.env['OZ_API_URL'] || ''
 export const IS_TELEMETRY_ENABLED = process.env['LEON_TELEMETRY'] === 'true'
 
 export const LLM_SKILL_ROUTER_DUTY_SKILL_LIST_PATH = path.join(

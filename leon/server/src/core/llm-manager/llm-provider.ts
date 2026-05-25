@@ -94,7 +94,7 @@ const RETRYABLE_ERROR_RETRY_DELAY_MS = 1_250
 const EMPTY_COMPLETION_RETRY_DELAY_MS = 750
 const MAX_LOG_SERIALIZED_LENGTH = 4_000
 const DEFAULT_TEMPERATURE = 0 // Disabled
-const DEFAULT_MAX_TOKENS = 8_192
+const DEFAULT_MAX_TOKENS = 190
 const NO_LLM_ENABLED_MESSAGE =
   'I need an AI engine before I can answer. Use the built-in command "/model <provider> <model name>" to configure a model. Just press "/" to open built-in commands.'
 const LLM_PROVIDER_NOT_READY_MESSAGE =
