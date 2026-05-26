@@ -607,15 +607,8 @@ export default class AISDKRemoteLLMProvider {
         }
       }
     } else if (this.config.flavor === 'openai-compatible') {
-      if (completionParams.disableThinking === true) {
-        providerOptions['openaiCompatible'] = {
-          reasoningEffort: 'low'
-        }
-      } else {
-        providerOptions['openaiCompatible'] = {
-          reasoningEffort: 'high'
-        }
-      }
+      // openai-compatible providers (Ollama, SGLang, LlamaCPP, etc.)
+      // do not support reasoningEffort — omit provider options entirely
     } else if (this.config.flavor === 'anthropic') {
       providerOptions['anthropic'] = completionParams.disableThinking === true
         ? {

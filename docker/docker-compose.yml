@@ -133,6 +133,7 @@ services:
       LEON_GROQ_API_KEY: ${GROQ_API_KEY}
       LEON_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       LEON_LLAMACPP_BASE_URL: http://llama-cpp:8080/v1
+      LEON_OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
       LEON_OVER_HTTP: "true"
       LEON_WAKE_WORD: "false"
       LEON_STT: "false"
@@ -148,6 +149,8 @@ services:
       OZ_DEFAULT_AGENT_TYPE: opencode
       OZ_DEFAULT_MAX_RUNTIME: "300"
       OZ_PUBLIC_URL: http://localhost:8090
+    extra_hosts:
+      - host.docker.internal:host-gateway
     volumes:
       - leon_profile:/root/.leon
       - /var/run/docker.sock:/var/run/docker.sock

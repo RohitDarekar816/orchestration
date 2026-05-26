@@ -219,6 +219,12 @@ export default class NLU {
     LogHelper.info('Choosing skill...')
 
     try {
+      const greetingPattern = /^(hello|hi|hey|greetings|good morning|good (evening|afternoon)|howdy|what'?s up|sup|how are you|how'?s it going)\b/i
+      if (greetingPattern.test(utterance.trim())) {
+        LogHelper.success('Greeting detected — routing directly to introduction_skill')
+        return 'introduction_skill' as NLPSkill
+      }
+
       const skillRouterHistory = await CONVERSATION_LOGGER.load({
         nbOfLogsToLoad: 6
       })

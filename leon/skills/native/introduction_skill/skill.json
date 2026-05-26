@@ -6,9 +6,9 @@
   "version": "1.0.0",
   "description": "Leon introduces himself and remembers basic information about you.",
   "author": {
-    "name": "Louis Grenard",
-    "email": "louis@getleon.ai",
-    "url": "https://github.com/louistiti"
+    "name": "Rohit Darekar",
+    "email": "rohit.darekar@aitglobalinc.com",
+    "url": "https://github.com/RohitDarekar816/rohitdarekar816"
   },
   "actions": {
     "introduce_leon": {

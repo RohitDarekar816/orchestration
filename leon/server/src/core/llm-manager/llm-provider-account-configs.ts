@@ -67,6 +67,12 @@ export const LLM_PROVIDER_ACCOUNT_CONFIGS: ReadonlyArray<LLMProviderAccountConfi
       value: LLMProviders.HuggingFace,
       apiKeyEnv: 'LEON_HUGGINGFACE_API_KEY',
       apiKeyURL: 'https://huggingface.co/settings/tokens'
+    },
+    {
+      label: 'Ollama (Local)',
+      value: LLMProviders.Ollama,
+      apiKeyEnv: '',
+      apiKeyURL: null
     }
   ])
 

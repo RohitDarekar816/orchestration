@@ -90,7 +90,8 @@ export const getInfo: FastifyPluginAsync<APIOptions> = async (
           agentProvider: agentTarget.provider,
           workflowModel: modelState.getWorkflowModelName(),
           agentModel: modelState.getAgentModelName(),
-          localModel: modelState.getLocalModelName()
+          localModel: modelState.getLocalModelName(),
+          targetValue: modelState.getWorkflowTargetValue()
         },
         stt: {
           enabled: HAS_STT,

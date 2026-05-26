@@ -10,6 +10,7 @@ import FileSystemAutocomplete from './file-system-autocomplete'
 import SessionsPanel from './sessions'
 import { onkeydownstartrecording, onkeydowninput } from './onkeydown'
 import { initAuth, isAuthenticated, getToken, validateToken, authReady } from './auth'
+import { initModelToggle } from './model-switch'
 
 const config = {
   app: 'webapp',
@@ -113,6 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     client.init()
     fileSystemAutocomplete.attach(input)
     builtInCommands.init()
+    initModelToggle(serverUrl)
 
     infoButton.addEventListener('click', () => {
       alert(JSON.stringify(infoToDisplay, null, 2))

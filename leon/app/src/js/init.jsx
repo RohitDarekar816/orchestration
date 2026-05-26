@@ -116,12 +116,6 @@ function Init() {
   })
 
   useEffect(() => {
-    setTimeout(() => {
-      if (parentRef.current) {
-        parentRef.current.classList.remove('not-initialized')
-      }
-    }, 250)
-
     function handleStatusChange(event) {
       const { statusName, statusType } = event.detail
 
@@ -151,6 +145,17 @@ function Init() {
   }
 
   const areAllStatusesSuccess = statuses.every((status) => status === 'success')
+  useEffect(() => {
+    if (areAllStatusesSuccess) {
+      const el = document.querySelector('#init')
+      if (el) {
+        el.style.opacity = '0'
+        el.style.visibility = 'hidden'
+        el.style.pointerEvents = 'none'
+        console.log('[D] HIDING overlay via JS')
+      }
+    }
+  }, [areAllStatusesSuccess])
 
   useEffect(() => {
     if (window.leonConfigInfo) {

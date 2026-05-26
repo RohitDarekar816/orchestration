@@ -39,6 +39,9 @@ Response: video_summarizer_skill
 User Query: "Add 'Dentist Appointment' to my todo list."
 Response: todo_list_skill
 
+User Query: "Hello, how are you?"
+Response: introduction_skill
+
 User Query: "Just a test message, nothing to do."
 Response: None
 
