@@ -35,6 +35,41 @@ check_env() {
     info ".env found."
 }
 
+# ── Command Code API Key ──────────────────────────────────────────────────────
+setup_commandcode_key() {
+    info "Checking Command Code API key..."
+    
+    # Check if key already exists in .env
+    if grep -q "^COMMANDCODE_API_KEY=" "$DOCKER_DIR/.env" 2>/dev/null || \
+       grep -q "^LEON_COMMANDCODE_API_KEY=" "$DOCKER_DIR/.env" 2>/dev/null; then
+        info "Command Code API key already configured in .env"
+        return
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "  ${YELLOW}Command Code API Key Setup${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "Command Code is used for AI agent execution and Leon LLM processing."
+    echo "Get your API key from: https://commandcode.ai/settings/api-keys"
+    echo ""
+    
+    read -rp "Enter your Command Code API key (or press Enter to skip): " api_key
+    
+    if [ -n "$api_key" ]; then
+        # Add keys to .env file
+        echo "" >> "$DOCKER_DIR/.env"
+        echo "# Command Code API Keys" >> "$DOCKER_DIR/.env"
+        echo "COMMANDCODE_API_KEY=$api_key" >> "$DOCKER_DIR/.env"
+        echo "LEON_COMMANDCODE_API_KEY=$api_key" >> "$DOCKER_DIR/.env"
+        info "Command Code API key saved to .env"
+    else
+        warn "No API key provided. You can add it later to $DOCKER_DIR/.env"
+    fi
+    echo ""
+}
+
 # ── Build ─────────────────────────────────────────────────────────────────────
 build_images() {
     info "Building images (this may take a few minutes)..."
@@ -116,6 +151,7 @@ main() {
 
     install_docker
     check_env
+    setup_commandcode_key
     build_images
     start_services
     create_admin

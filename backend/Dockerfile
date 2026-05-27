@@ -24,10 +24,11 @@ RUN npm install -g \
     opencode-ai \
     @anthropic-ai/claude-code \
     @openai/codex \
-    @google/gemini-cli && \
+    @google/gemini-cli \
+    command-code && \
     rm -rf /root/.npm /tmp/*
 
-RUN opencode --version && claude --version && codex --version && gemini --version
+RUN opencode --version && claude --version && codex --version && gemini --version && commandcode --version
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

@@ -85,7 +85,8 @@ const LLM_PROVIDERS_MAP = {
   [LLMProviders.MoonshotAI]: 'moonshotai-llm-provider',
   [LLMProviders.Cerebras]: 'cerebras-llm-provider',
   [LLMProviders.HuggingFace]: 'huggingface-llm-provider',
-  [LLMProviders.Ollama]: 'ollama-llm-provider'
+  [LLMProviders.Ollama]: 'ollama-llm-provider',
+  [LLMProviders.CommandCode]: 'commandcode-llm-provider'
 }
 const DEFAULT_MAX_EXECUTION_RETRIES = 2
 const DEFAULT_REMOTE_PROVIDER_ERROR_RETRIES = 1

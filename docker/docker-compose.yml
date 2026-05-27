@@ -132,6 +132,7 @@ services:
       LEON_LLM: openrouter/nvidia/nemotron-3-super-120b-a12b:free
       LEON_GROQ_API_KEY: ${GROQ_API_KEY}
       LEON_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      LEON_COMMANDCODE_API_KEY: ${LEON_COMMANDCODE_API_KEY}
       LEON_LLAMACPP_BASE_URL: http://llama-cpp:8080/v1
       LEON_OLLAMA_BASE_URL: http://host.docker.internal:11434/v1
       LEON_OVER_HTTP: "true"

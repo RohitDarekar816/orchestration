@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     oz_nvidia_api_key: str = ""
     oz_github_token: str = ""
 
-    allowed_agents: list[str] = ["claude-code", "codex", "gemini-cli", "opencode", "custom", "github"]
+    allowed_agents: list[str] = ["claude-code", "codex", "gemini-cli", "opencode", "custom", "github", "commandcode"]
+    oz_commandcode_api_key: str = ""
 
 
 @lru_cache

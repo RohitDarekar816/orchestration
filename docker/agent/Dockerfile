@@ -51,6 +51,7 @@ RUN npm install -g \
     @anthropic-ai/claude-code \
     @openai/codex \
     @google/gemini-cli \
+    command-code \
     && rm -rf /root/.npm /tmp/npm-*
 
 # ── oz-local agent (lightweight LLM→bash loop for small local models) ─────────

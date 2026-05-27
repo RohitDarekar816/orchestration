@@ -105,6 +105,8 @@ class LocalAgentRunner:
             return ["gemini", "-p", fp + (prompt or "")], None
         elif agent == "github":
             return ["bash", "-c", prompt or ""], None
+        elif agent == "commandcode":
+            return ["commandcode", "run", "--print", fp + (prompt or "")], None
         elif agent == "custom":
             return [], fp + (prompt or "")
         return [], None
@@ -244,6 +246,10 @@ class DockerAgentRunner:
             env_vars.setdefault("GITHUB_TOKEN", settings.oz_github_token)
             env_vars.setdefault("GH_TOKEN", settings.oz_github_token)
 
+        # commandcode agent: pass API key if available.
+        if self.agent_run.agent_type == "commandcode" and settings.oz_commandcode_api_key:
+            env_vars.setdefault("COMMANDCODE_API_KEY", settings.oz_commandcode_api_key)
+
         # oz-local: prefer OpenRouter when available, else fall back to local llama-cpp.
         if self.agent_run.agent_type == "oz-local":
             if os.environ.get("OPENROUTER_API_KEY"):
@@ -376,6 +382,8 @@ class DockerAgentRunner:
             return ["gemini", "-p", fp + prompt]
         elif agent_type == "github":
             return ["bash", "-c", prompt]
+        elif agent_type == "commandcode":
+            return ["commandcode", "run", "--print", fp + prompt]
         return ["bash", "-c", prompt]
 
     async def _update_status(self, status: AgentStatus):

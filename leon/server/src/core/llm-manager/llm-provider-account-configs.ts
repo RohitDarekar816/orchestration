@@ -73,6 +73,12 @@ export const LLM_PROVIDER_ACCOUNT_CONFIGS: ReadonlyArray<LLMProviderAccountConfi
       value: LLMProviders.Ollama,
       apiKeyEnv: '',
       apiKeyURL: null
+    },
+    {
+      label: 'Command Code',
+      value: LLMProviders.CommandCode,
+      apiKeyEnv: 'LEON_COMMANDCODE_API_KEY',
+      apiKeyURL: 'https://commandcode.ai/settings/api-keys'
     }
   ])
 
