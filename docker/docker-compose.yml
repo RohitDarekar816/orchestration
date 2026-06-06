@@ -100,8 +100,8 @@ services:
     build:
       context: ./llama-cpp
       dockerfile: Dockerfile
-    ports:
-      - "11435:8080"
+    expose:
+      - "8080"
     volumes:
       - oz_llama_models:/models
     environment:

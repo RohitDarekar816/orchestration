@@ -95,6 +95,14 @@ export function extractOutput(
   return `[… output truncated — showing last ~${maxChars} chars …]\n${trimmed}`
 }
 
+// ── Token Cache ───────────────────────────────────────────────────────────────
+
+let _cachedToken: { token: string; expiresAt: number } | null = null
+
+// ── Server Cache ──────────────────────────────────────────────────────────────
+
+let _cachedServers: { servers: ServerSummary[]; apiUrl: string; fetchedAt: number } | null = null
+
 // ── Network retry ─────────────────────────────────────────────────────────────
 
 function isRetryable(err: unknown): boolean {
@@ -148,6 +156,11 @@ export async function getToken(
 ): Promise<string> {
   if (cfg.authToken) return cfg.authToken
 
+  // Use cached token if still valid (JWT tokens typically last 60 min — cache for 50).
+  if (_cachedToken && Date.now() < _cachedToken.expiresAt) {
+    return _cachedToken.token
+  }
+
   if (!cfg.email || !cfg.password) {
     throw new Error('Oz API credentials not configured. Set oz_auth_token or oz_email + oz_password in settings.')
   }
@@ -167,7 +180,17 @@ export async function getToken(
 
   const token = res.data.access_token as string
   if (!token) throw new Error('Authentication failed: no token returned.')
+
+  _cachedToken = { token, expiresAt: Date.now() + 50 * 60 * 1000 }
   return token
+}
+
+export function clearTokenCache(): void {
+  _cachedToken = null
+}
+
+export function clearServerCache(): void {
+  _cachedServers = null
 }
 
 // ── Server registry ───────────────────────────────────────────────────────────
@@ -195,6 +218,11 @@ export async function fetchAllServers(
   token: string,
   network: Network
 ): Promise<ServerSummary[]> {
+  // Cache server list for 30 seconds — servers rarely change mid-conversation.
+  if (_cachedServers && _cachedServers.apiUrl === apiUrl && Date.now() - _cachedServers.fetchedAt < 30_000) {
+    return _cachedServers.servers
+  }
+
   const res = await withRetry(() =>
     network.request<ServerSummary[]>({
       url: `${apiUrl}/servers`,
@@ -202,7 +230,10 @@ export async function fetchAllServers(
       headers: { Authorization: `Bearer ${token}` },
     })
   )
-  return Array.isArray(res.data) ? res.data : []
+
+  const servers = Array.isArray(res.data) ? res.data : []
+  _cachedServers = { servers, apiUrl, fetchedAt: Date.now() }
+  return servers
 }
 
 export async function findServerInUtterance(
@@ -268,12 +299,12 @@ export async function launchAndWait(opts: {
   const agentId = launchRes.data.id
   const startMs = Date.now()
   const deadline = startMs + maxPollSeconds * 1000
-  let interval = 2000
+  let interval = 3000
   let lastProgressMs = startMs
 
   while (Date.now() < deadline) {
     await sleep(interval)
-    interval = Math.min(Math.round(interval * 1.5), 10_000)
+    interval = Math.min(Math.round(interval * 2), 15_000)
 
     // Emit a progress heartbeat every ~30 s for long-running tasks.
     if (onProgress && Date.now() - lastProgressMs >= PROGRESS_INTERVAL_MS) {

@@ -3,6 +3,8 @@ import { leon } from '@sdk/leon'
 import { Network, NetworkError } from '@sdk/network'
 import { Settings } from '@sdk/settings'
 
+import { errorMessage, getOzConfig, getToken } from '../lib/oz_client'
+
 interface AgentDetail {
   id: number
   agent_type: string
@@ -16,10 +18,7 @@ interface AgentDetail {
 
 export const run: ActionFunction = async function (params) {
   const settings = new Settings()
-  const apiUrl = (await settings.get('oz_api_url')) || 'http://localhost:8000/api'
-  const authToken = await settings.get('oz_auth_token')
-  const email = await settings.get('oz_email')
-  const password = await settings.get('oz_password')
+  const network = new Network()
 
   const agentId = params.action_arguments?.id as string | undefined
   if (!agentId) {
@@ -30,33 +29,15 @@ export const run: ActionFunction = async function (params) {
     return
   }
 
-  const network = new Network()
-  let token = authToken as string | undefined
-  if (!token && email && password) {
-    try {
-      const formData = new URLSearchParams()
-      formData.append('username', email as string)
-      formData.append('password', password as string)
-      const authRes = await network.request({
-        url: `${apiUrl}/auth/token`,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        data: formData.toString(),
-      })
-      token = (authRes.data as Record<string, unknown>).access_token as string
-    } catch {
-      await leon.answer({
-        key: 'error',
-        data: { message: 'Failed to authenticate with Oz.' },
-      })
-      return
-    }
-  }
-
-  if (!token) {
+  let cfg: { apiUrl: string }
+  let token: string
+  try {
+    cfg = await getOzConfig(settings)
+    token = await getToken(cfg, network)
+  } catch {
     await leon.answer({
       key: 'error',
-      data: { message: 'Oz API credentials not configured.' },
+      data: { message: 'Failed to authenticate with Oz.' },
     })
     return
   }
@@ -65,7 +46,7 @@ export const run: ActionFunction = async function (params) {
 
   try {
     const res = await network.request<AgentDetail>({
-      url: `${apiUrl}/agents/${agentId}`,
+      url: `${cfg.apiUrl}/agents/${agentId}`,
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` },
     })
@@ -77,7 +58,7 @@ export const run: ActionFunction = async function (params) {
     }
 
     const logsRes = await network.request<unknown[] | string>({
-      url: `${apiUrl}/agents/${agentId}/logs`,
+      url: `${cfg.apiUrl}/agents/${agentId}/logs`,
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` },
     })
@@ -105,16 +86,13 @@ export const run: ActionFunction = async function (params) {
       },
     })
   } catch (error) {
-    let message = 'Unknown error'
     if (error instanceof NetworkError) {
-      if (error.response.statusCode === 404) {
+      const code: number = (error as NetworkError & { response?: { statusCode?: number } }).response?.statusCode ?? 0
+      if (code === 404) {
         await leon.answer({ key: 'not_found', data: { agent_id: agentId } })
         return
       }
-      message = String(error.response.data)
-    } else if (error instanceof Error) {
-      message = error.message
     }
-    await leon.answer({ key: 'error', data: { message } })
+    await leon.answer({ key: 'error', data: { message: errorMessage(error) } })
   }
 }
