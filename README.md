@@ -31,7 +31,6 @@ Default admin credentials (auto-seeded): `admin@oz.local` / `admin123`
 | `db` | PostgreSQL 16 |
 | `redis` | Redis 7 (broker/cache) |
 | `leon` | Leon AI assistant — NLU, routing, skill execution |
-| `llama-cpp` | Local LLM inference (optional fallback) |
 | `oz-agent` | Agent runtime sandbox (spawned on demand) |
 
 ## Architecture

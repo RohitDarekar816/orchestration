@@ -175,7 +175,6 @@ The container exits, Oz collects stdout, stores it in the database, and Leon pol
 | **db** | 5432 | PostgreSQL 16 | Primary relational data store |
 | **redis** | 6379 | Redis 7 | Task broker and cache |
 | **leon** | 5366 | Node.js | AI assistant — NLU, skill routing, response |
-| **llama-cpp** | 11435 | llama.cpp | Optional local LLM inference (offline fallback) |
 | **oz-agent** | — | Debian 12 | On-demand sandbox container for agent execution |
 
 ### oz-agent Container
@@ -201,7 +200,7 @@ Oz supports multiple AI agent backends. The agent type is configurable per run, 
 | **claude-code** | `claude` | Anthropic Claude | `ANTHROPIC_API_KEY` |
 | **codex** | `codex` | OpenAI GPT-4o | `OPENAI_API_KEY` |
 | **gemini-cli** | `gemini` | Google Gemini | `GEMINI_API_KEY` |
-| **oz-local** | Python script | Local llama.cpp | None (local model) |
+| **oz-local** | Python script | Remote OpenRouter | None |
 | **custom** | Custom | User-defined | Depends |
 
 ### OpenCode Free Models
@@ -589,7 +588,6 @@ Every significant action is recorded:
 | `SECRET_KEY` | `change-me-in-production` | JWT signing key — **change in production** |
 | `OZ_RUNNER` | `docker` | Agent runner: `docker` or `local` |
 | `OZ_AGENT_NETWORK` | `host` | Docker network mode for agent containers |
-| `OZ_LLAMACPP_URL` | `http://llama-cpp:8080/v1` | Local LLM endpoint |
 | `OZ_OPENCODE_MODEL` | `opencode/deepseek-v4-flash-free` | OpenCode model to use |
 | `OZ_NVIDIA_API_KEY` | — | NVIDIA API key (optional, for paid models) |
 
@@ -767,7 +765,6 @@ orchestration/
 | **Web Server** | Nginx | Alpine | Static file serving & proxy |
 | **AI Assistant** | Leon | 1.0.0-beta | NLU + skill routing |
 | **LLM (Routing)** | Groq `llama-3.1-8b-instant` | — | ~2s utterance routing |
-| **LLM (Local)** | llama.cpp (Qwen 2.5 1.5B) | — | Offline LLM fallback |
 | **Agent (default)** | OpenCode | Latest | Free AI coding agent |
 | **Agent model** | DeepSeek V4 Flash (free) | — | No API key required |
 | **Containerisation** | Docker + Compose | 26+ | Full stack orchestration |

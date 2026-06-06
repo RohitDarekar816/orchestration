@@ -7,6 +7,7 @@ import { WidgetWrapper, Flexbox, Loader, Text, Markdown } from '@aurora'
 
 import renderAuroraComponent from './render-aurora-component'
 import ToolUIHandler from './tool-ui-handler'
+import { getToken } from './auth'
 
 const WIDGETS_TO_FETCH = []
 const WIDGETS_FETCH_CACHE = new Map()
@@ -948,11 +949,15 @@ export default class Chatbot {
 
   openPath(filePath) {
     // Send request to server to open the file path in system file explorer
+    const token = getToken()
+    const headers = { 'Content-Type': 'application/json' }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
     fetch(`${this.serverURL}/api/v1/open-path`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({ path: filePath })
     })
       .then((response) => response.json())

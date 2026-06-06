@@ -158,10 +158,18 @@ function Init() {
   }, [areAllStatusesSuccess])
 
   useEffect(() => {
-    if (window.leonConfigInfo) {
-      setConfig({ ...window.leonConfigInfo })
+    // window.leonConfigInfo is set asynchronously in main.js after the /api/v1/info fetch.
+    // We listen to a custom event dispatched by main.js instead of depending on the
+    // mutable global directly, since React cannot track plain object property mutations.
+    function handleConfigReady(event) {
+      if (event.detail) {
+        setConfig({ ...event.detail })
+      }
     }
-  }, [window.leonConfigInfo])
+
+    window.addEventListener('leon-config-ready', handleConfigReady)
+    return () => window.removeEventListener('leon-config-ready', handleConfigReady)
+  }, [])
 
   return (
     <div

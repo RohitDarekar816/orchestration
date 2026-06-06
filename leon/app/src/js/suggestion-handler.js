@@ -25,8 +25,11 @@ export default function handleSuggestions(data, chatbot, client) {
               name: 'suggestion',
               value: suggestionText,
               onClick: (suggestion) => {
-                const parent = container.parentNode
+                // Unmount the React root before removing the DOM node to avoid
+                // the memory leak caused by orphaned React roots.
+                root.unmount()
 
+                const parent = container.parentNode
                 if (parent) {
                   parent.removeChild(container)
                 }

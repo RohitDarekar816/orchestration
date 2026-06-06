@@ -20,16 +20,7 @@
   "engines": {
     "node": ">=24.0.0"
   },
-  "devEngines": {
-    "runtime": {
-      "name": "node",
-      "onFail": "error"
-    },
-    "packageManager": {
-      "name": "pnpm",
-      "onFail": "error"
-    }
-  },
+
   "volta": {
     "node": "24.15.0"
   },

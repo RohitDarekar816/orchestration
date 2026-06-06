@@ -24,9 +24,6 @@ class Settings(BaseSettings):
     # container. Use "bridge" if you prefer network isolation and don't need VPN.
     oz_agent_network: str = "host"
 
-    # Local llama-cpp server for opencode agents (OpenAI-compatible API).
-    # Set to empty string to disable local LLM injection (agents must supply their own keys).
-    oz_llamacpp_url: str = ""
     oz_opencode_model: str = "openai/gpt-4o-mini"
     oz_nvidia_api_key: str = ""
     oz_github_token: str = ""

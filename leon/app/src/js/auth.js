@@ -57,70 +57,127 @@ export const authReady = new Promise((resolve) => {
   resolveAuthReady = resolve
 })
 
+/**
+ * Show a form-level error message.
+ */
+function showError(errorDiv, submitBtn, message) {
+  errorDiv.textContent = message
+  errorDiv.classList.remove('hidden')
+  submitBtn.disabled = false
+}
+
+/**
+ * Hide a form-level error message.
+ */
+function hideError(errorDiv) {
+  errorDiv.classList.add('hidden')
+}
+
 export function initAuth() {
   const section = document.querySelector('#auth-section')
-  const tabs = document.querySelectorAll('.auth-tab')
-  const loginForm = document.querySelector('#auth-form-login')
-  const emailInput = document.querySelector('#auth-email')
-  const passwordInput = document.querySelector('#auth-password')
-  const nameInput = document.querySelector('#auth-name')
-  const nameField = document.querySelector('#auth-name-field')
-  const errorDiv = document.querySelector('#auth-error')
-  const submitBtn = document.querySelector('#auth-submit')
 
   if (!section) return
 
+  const tabs = document.querySelectorAll('.auth-tab')
+  const loginForm = document.querySelector('#auth-form-login')
+  const registerForm = document.querySelector('#auth-form-register')
+
+  // Login form elements
+  const loginEmail = document.querySelector('#auth-email-login')
+  const loginPassword = document.querySelector('#auth-password-login')
+  const loginError = document.querySelector('#auth-error-login')
+  const loginSubmit = document.querySelector('#auth-submit-login')
+
+  // Register form elements
+  const registerName = document.querySelector('#auth-name-register')
+  const registerEmail = document.querySelector('#auth-email-register')
+  const registerPassword = document.querySelector('#auth-password-register')
+  const registerError = document.querySelector('#auth-error-register')
+  const registerSubmit = document.querySelector('#auth-submit-register')
+
+  /**
+   * Switch the visible form and active tab.
+   */
+  function switchTab(targetTab) {
+    tabs.forEach((t) => t.classList.remove('active'))
+    targetTab.classList.add('active')
+
+    const isRegister = targetTab.dataset.tab === 'register'
+    loginForm.classList.toggle('active', !isRegister)
+    registerForm.classList.toggle('active', isRegister)
+
+    // Clear errors and inputs when switching tabs
+    hideError(loginError)
+    hideError(registerError)
+  }
+
   tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      tabs.forEach((t) => t.classList.remove('active'))
-      tab.classList.add('active')
-      const isRegister = tab.dataset.tab === 'register'
-      nameField.classList.toggle('hidden', !isRegister)
-      submitBtn.textContent = isRegister ? 'Sign Up' : 'Sign In'
-      errorDiv.classList.add('hidden')
-    })
+    tab.addEventListener('click', () => switchTab(tab))
   })
 
+  /**
+   * Handle login form submission.
+   */
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault()
-    const email = emailInput.value.trim()
-    const password = passwordInput.value
-    const isRegister = document.querySelector('.auth-tab.active').dataset.tab === 'register'
-    const fullName = nameInput.value.trim()
+
+    const email = loginEmail.value.trim()
+    const password = loginPassword.value
 
     if (!email || !password) {
-      errorDiv.textContent = 'Email and password are required'
-      errorDiv.classList.remove('hidden')
+      showError(loginError, loginSubmit, 'Email and password are required')
       return
     }
 
-    if (isRegister && !fullName) {
-      errorDiv.textContent = 'Full name is required'
-      errorDiv.classList.remove('hidden')
-      return
-    }
-
-    submitBtn.disabled = true
-    errorDiv.classList.add('hidden')
+    loginSubmit.disabled = true
+    hideError(loginError)
 
     try {
-      if (isRegister) {
-        await register(email, password, fullName)
-        await login(email, password)
-      } else {
-        await login(email, password)
-      }
+      await login(email, password)
       section.style.display = 'none'
       resolveAuthReady(true)
-    } catch (e) {
+    } catch (err) {
       const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.detail ||
-        'Authentication failed'
-      errorDiv.textContent = msg
-      errorDiv.classList.remove('hidden')
-      submitBtn.disabled = false
-      resolveAuthReady(false)
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        'Login failed. Please check your credentials.'
+      showError(loginError, loginSubmit, msg)
+    }
+  })
+
+  /**
+   * Handle register form submission.
+   */
+  registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+
+    const fullName = registerName.value.trim()
+    const email = registerEmail.value.trim()
+    const password = registerPassword.value
+
+    if (!fullName) {
+      showError(registerError, registerSubmit, 'Full name is required')
+      return
+    }
+    if (!email || !password) {
+      showError(registerError, registerSubmit, 'Email and password are required')
+      return
+    }
+
+    registerSubmit.disabled = true
+    hideError(registerError)
+
+    try {
+      await register(email, password, fullName)
+      await login(email, password)
+      section.style.display = 'none'
+      resolveAuthReady(true)
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        'Registration failed. Please try again.'
+      showError(registerError, registerSubmit, msg)
     }
   })
 }

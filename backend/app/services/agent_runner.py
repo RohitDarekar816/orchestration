@@ -250,15 +250,12 @@ class DockerAgentRunner:
         if self.agent_run.agent_type == "commandcode" and settings.oz_commandcode_api_key:
             env_vars.setdefault("COMMANDCODE_API_KEY", settings.oz_commandcode_api_key)
 
-        # oz-local: prefer OpenRouter when available, else fall back to local llama-cpp.
+        # oz-local: prefer OpenRouter when available.
         if self.agent_run.agent_type == "oz-local":
             if os.environ.get("OPENROUTER_API_KEY"):
                 env_vars.setdefault("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
                 env_vars.setdefault("OPENAI_API_KEY", os.environ["OPENROUTER_API_KEY"])
                 env_vars.setdefault("OZ_LOCAL_MODEL", "meta-llama/llama-3.1-8b-instruct")
-            elif settings.oz_llamacpp_url:
-                env_vars.setdefault("OPENAI_BASE_URL", settings.oz_llamacpp_url)
-                env_vars.setdefault("OPENAI_API_KEY", "sk-local")
 
         # opencode: route models to the right provider.
         if self.agent_run.agent_type == "opencode":
@@ -269,9 +266,6 @@ class DockerAgentRunner:
                 elif os.environ.get("OPENROUTER_API_KEY"):
                     env_vars.setdefault("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
                     env_vars.setdefault("OPENAI_API_KEY", os.environ["OPENROUTER_API_KEY"])
-                elif settings.oz_llamacpp_url:
-                    env_vars.setdefault("OPENAI_BASE_URL", settings.oz_llamacpp_url)
-                    env_vars.setdefault("OPENAI_API_KEY", "sk-local")
 
         cmd = self._build_cmd()
         image = self.agent_run.image or "oz-agent:latest"

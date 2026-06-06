@@ -22,19 +22,31 @@
         </div>
         <form id="auth-form-login" class="auth-form active">
           <div class="auth-field">
-            <label for="auth-email">Email</label>
-            <input id="auth-email" type="email" placeholder="you@example.com" required />
+            <label for="auth-email-login">Email</label>
+            <input id="auth-email-login" type="email" placeholder="you@example.com" autocomplete="email" required />
           </div>
           <div class="auth-field">
-            <label for="auth-password">Password</label>
-            <input id="auth-password" type="password" placeholder="••••••••" required />
+            <label for="auth-password-login">Password</label>
+            <input id="auth-password-login" type="password" placeholder="••••••••" autocomplete="current-password" required />
           </div>
-          <div id="auth-name-field" class="auth-field hidden">
-            <label for="auth-name">Full Name</label>
-            <input id="auth-name" type="text" placeholder="Your Name" />
+          <div id="auth-error-login" class="auth-error hidden"></div>
+          <button id="auth-submit-login" type="submit">Sign In</button>
+        </form>
+        <form id="auth-form-register" class="auth-form">
+          <div class="auth-field">
+            <label for="auth-name-register">Full Name</label>
+            <input id="auth-name-register" type="text" placeholder="Your Name" autocomplete="name" required />
           </div>
-          <div id="auth-error" class="auth-error hidden"></div>
-          <button id="auth-submit" type="submit">Sign In</button>
+          <div class="auth-field">
+            <label for="auth-email-register">Email</label>
+            <input id="auth-email-register" type="email" placeholder="you@example.com" autocomplete="email" required />
+          </div>
+          <div class="auth-field">
+            <label for="auth-password-register">Password</label>
+            <input id="auth-password-register" type="password" placeholder="••••••••" autocomplete="new-password" required />
+          </div>
+          <div id="auth-error-register" class="auth-error hidden"></div>
+          <button id="auth-submit-register" type="submit">Sign Up</button>
         </form>
       </div>
     </div>
@@ -182,7 +194,7 @@
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
-              <g filter="url(#filter0_i_6_24)">
+              <g filter="url(#filter0_i_6_24_b)">
                 <circle
                   cx="118.5"
                   cy="118.5"
@@ -193,7 +205,7 @@
               </g>
               <defs>
                 <filter
-                  id="filter0_i_6_24"
+                  id="filter0_i_6_24_b"
                   x="0"
                   y="0"
                   width="237"

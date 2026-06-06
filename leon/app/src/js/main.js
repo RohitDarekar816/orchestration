@@ -31,6 +31,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     ])
 
     window.leonConfigInfo = response.data
+    window.dispatchEvent(
+      new CustomEvent('leon-config-ready', { detail: response.data })
+    )
     const authEnabled = window.leonConfigInfo.auth?.enabled === true
 
     if (authEnabled) {
@@ -49,7 +52,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.body.classList.add('auth-required')
         document.body.classList.remove('settingup')
         initAuth()
-        await authReady
+        const authSucceeded = await authReady
+        if (!authSucceeded) return
         document.documentElement.classList.remove('auth-required')
         document.body.classList.remove('auth-required')
         document.body.classList.add('settingup')

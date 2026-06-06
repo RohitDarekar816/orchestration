@@ -599,7 +599,7 @@ export default class Client {
     }
 
     if (val[0] === ' ') {
-      val = val.substr(1, val.length - 1)
+      val = val.slice(1)
     }
 
     if (this.parsedHistory[this.parsedHistory.length - 1] !== val) {
