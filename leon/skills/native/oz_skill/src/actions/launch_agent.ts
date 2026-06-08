@@ -18,6 +18,36 @@ import {
 // share the same GitHub file card state.
 const _G = (globalThis as any).__oz_launch_shared = (globalThis as any).__oz_launch_shared || { ghCard: null as string | null }
 
+const AGENT_TYPE_LABELS: Record<string, string> = {
+  docker_agent: 'Docker',
+  k8s_agent: 'Kubernetes',
+  linux_agent: 'Linux',
+  code_review: 'Code Review',
+  git_agent: 'Git',
+  opencode: 'Infrastructure',
+  'oz-local': 'AI',
+  'claude-code': 'Claude Code',
+  commandcode: 'Command Code',
+  cloudflare_docker_agent: 'Cloudflare Docker',
+}
+
+/**
+ * Infer the most appropriate specialized agent type from the user's utterance.
+ * Falls back to defaultType when no keywords match.
+ */
+function detectAgentType(utterance: string, defaultType: string): string {
+  const u = utterance.toLowerCase()
+  if (/\b(kubectl|kubernetes|k8s|helm|pod|pods|namespace|ingress|configmap|statefulset|daemonset|replicaset)\b/.test(u)) return 'k8s_agent'
+  if (/\b(docker|container|containers|compose|dockerfile|registry|docker\s*ps|docker\s*logs)\b/.test(u)) {
+    // Route to Cloudflare Docker agent when it is set as default, otherwise use local docker_agent.
+    return defaultType === 'cloudflare_docker_agent' ? 'cloudflare_docker_agent' : 'docker_agent'
+  }
+  if (/\b(code\s*review|pull\s*request|security\s*audit|code\s*quality|vulnerability|vulnerabilities|lint|static\s*analysis)\b/.test(u)) return 'code_review'
+  if (/\b(git\s|github|gitlab|commit|branch|merge\s|rebase|repository|repo)\b/.test(u)) return 'git_agent'
+  if (/\b(cpu|memory|ram|disk\s|systemctl|journalctl|kernel|cron|firewall|iptables|ufw|process\s)\b/.test(u)) return 'linux_agent'
+  return defaultType
+}
+
 const FILE_RE = /\[FILE:([^\]]+)\]\s*\n?([\s\S]*?)\n?\[\/FILE\]/gi
 const CODEBLOCK_RE = /```(\w*)\n([\s\S]*?)```/g
 const LANG_HINTS: Record<string, string> = {
@@ -103,7 +133,8 @@ export const run: ActionFunction = async function (params) {
   }
 
   const serverName = (params.action_arguments?.server as string) || ''
-  const agentType = ((await settings.get('default_agent_type')) as string) || 'oz-local'
+  const defaultAgentType = ((await settings.get('default_agent_type')) as string) || 'oz-local'
+  const agentType = detectAgentType(params.utterance || prompt, defaultAgentType)
   const maxRuntime = Number((await settings.get('default_max_runtime')) as string) || 300
 
   try {
@@ -176,7 +207,9 @@ export const run: ActionFunction = async function (params) {
       }
     }
 
-    await leon.answer({ key: 'launching' })
+    const agentLabel = AGENT_TYPE_LABELS[agentType] || agentType
+    console.error('[oz-launch] detected agent type:', agentType)
+    await leon.answer({ key: 'launching', data: { agent_type: agentLabel } })
 
     const { output, status, agentId } = await launchAndWait({
       apiUrl: cfg.apiUrl,

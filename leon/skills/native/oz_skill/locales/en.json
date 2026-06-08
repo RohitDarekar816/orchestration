@@ -20,7 +20,7 @@
           { "text": "Agent <strong>#{{ agent_id }}</strong> — status: <strong>{{ status }}</strong>.", "speech": "Agent {{ agent_id }}, status {{ status }}." }
         ],
         "result": [
-          { "text": "{{ logs }}", "speech": "Here's the output." }
+          { "text": "<div>{{ logs }}</div>", "speech": "Here's the output." }
         ],
         "error": [
           { "text": "Sorry, something went wrong: {{ message }}", "speech": "Sorry, something went wrong." }
@@ -39,7 +39,7 @@
           { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
         ],
         "health_result": [
-          { "text": "{{ logs }}", "speech": "Here is the health report." }
+          { "text": "<div>{{ logs }}</div>", "speech": "Here is the health report." }
         ],
         "error": [
           { "text": "Failed to check server health: {{ message }}", "speech": "Failed to check server health." }
@@ -55,7 +55,7 @@
           { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
         ],
         "logs_result": [
-          { "text": "{{ logs }}", "speech": "Here are the logs." }
+          { "text": "<div>{{ logs }}</div>", "speech": "Here are the logs." }
         ],
         "error": [
           { "text": "Failed to fetch logs: {{ message }}", "speech": "Failed to fetch logs." }
@@ -71,7 +71,7 @@
           { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
         ],
         "docker_logs_result": [
-          { "text": "{{ logs }}", "speech": "Here are the Docker logs." }
+          { "text": "<div>{{ logs }}</div>", "speech": "Here are the Docker logs." }
         ],
         "error": [
           { "text": "Failed to fetch Docker logs: {{ message }}", "speech": "Failed to fetch Docker logs." }
@@ -87,7 +87,7 @@
           { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
         ],
         "deploy_result": [
-          { "text": "{{ logs }}", "speech": "Deployment finished. Status: {{ status }}." }
+          { "text": "<div>{{ logs }}</div>", "speech": "Deployment finished. Status: {{ status }}." }
         ],
         "no_path": [
           { "text": "Please specify the project path to deploy. For example: deploy /var/www/myapp on prod-web.", "speech": "Please specify the project path to deploy." }
@@ -100,7 +100,7 @@
     "launch_agent": {
       "answers": {
         "launching": [
-          { "text": "Launching an Oz agent to handle that. One moment...", "speech": "Launching an Oz agent. One moment." }
+          { "text": "Launching a <strong>{{ agent_type }}</strong> agent. One moment...", "speech": "Launching an Oz agent. One moment." }
         ],
         "still_working": [
           { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
@@ -109,7 +109,7 @@
           { "text": "Agent <strong>#{{ agent_id }}</strong> — status: <strong>{{ status }}</strong>.", "speech": "Agent {{ agent_id }}, status {{ status }}." }
         ],
         "result": [
-          { "text": "{{ files_html }}{{ logs }}", "speech": "Here's what the agent found." }
+          { "text": "{{ files_html }}<div>{{ logs }}</div>", "speech": "Here's what the agent found." }
         ],
         "error": [
           { "text": "Sorry, I couldn't launch the agent: {{ message }}", "speech": "Sorry, I couldn't launch the agent." }
@@ -176,7 +176,7 @@
           { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
         ],
         "result": [
-          { "text": "{{ logs }}", "speech": "Here is the website status." }
+          { "text": "<div>{{ logs }}</div>", "speech": "Here is the website status." }
         ],
         "error": [
           { "text": "Failed to check website: {{ message }}", "speech": "Failed to check website." }
@@ -211,7 +211,7 @@
           { "text": "Calling the <strong>{{ agent_name }}</strong> n8n agent...", "speech": "Calling the n8n agent. One moment." }
         ],
         "n8n_result": [
-          { "text": "{{ result }}", "speech": "{{ result }}" }
+          { "text": "<div>{{ result }}</div>", "speech": "{{ result }}" }
         ],
         "error": [
           { "text": "Failed to call n8n agent: {{ message }}", "speech": "Failed to call n8n agent." }

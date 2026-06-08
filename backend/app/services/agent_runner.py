@@ -5,6 +5,8 @@ import re
 import traceback
 from datetime import datetime, timezone
 
+import httpx
+
 import docker
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +18,78 @@ from app.models.agent_command_audit import AgentCommandAudit
 from app.models.log import AgentLog
 
 settings = get_settings()
+
+# Agent types that use the opencode CLI but with a specialized system prompt.
+SPECIALIZED_OPENCODE_AGENTS: frozenset[str] = frozenset([
+    "docker_agent",
+    "k8s_agent",
+    "linux_agent",
+    "code_review",
+    "git_agent",
+])
+
+# System prompts injected before the user's prompt for each specialized agent.
+AGENT_SYSTEM_PROMPTS: dict[str, str] = {
+    "docker_agent": (
+        "You are a Docker operations specialist. Focus exclusively on Docker and container tasks: "
+        "managing containers (run, stop, rm, inspect, logs), "
+        "images (build, pull, push, tag, prune), "
+        "Docker Compose (up, down, restart, scale, logs), "
+        "volumes, networks, and registries. "
+        "When SSH credentials are provided, SSH to the target server first, then run Docker commands there.\n\n"
+    ),
+    "k8s_agent": (
+        "You are a Kubernetes specialist. Focus on cluster and workload operations: "
+        "pods, deployments, services, ingresses, configmaps, secrets, namespaces, "
+        "persistent volumes, resource quotas, RBAC, and Helm charts. "
+        "Use kubectl and helm CLI commands. "
+        "Always check the current context and namespace before running commands.\n\n"
+    ),
+    "linux_agent": (
+        "You are a Linux systems administrator. Focus on OS-level diagnostics and operations: "
+        "process management (ps, top, kill, systemctl, journalctl), "
+        "filesystem and disk (df, du, mount, lsblk), "
+        "networking (ss, netstat, ping, traceroute, curl), "
+        "log inspection (tail, grep, awk, journalctl), "
+        "package management (apt, yum, dnf), "
+        "user management, cron jobs, and performance profiling (vmstat, iostat). "
+        "Provide clear, structured findings with actionable recommendations.\n\n"
+    ),
+    "code_review": (
+        "You are a senior software engineer conducting a thorough code review. "
+        "Analyze code or repositories for: "
+        "bugs and logic errors, "
+        "security vulnerabilities (injection, XSS, auth flaws, exposed secrets, OWASP Top 10), "
+        "performance bottlenecks, "
+        "code quality and maintainability issues, "
+        "missing error handling, "
+        "test coverage gaps. "
+        "Structure your review with severity levels: [CRITICAL], [MAJOR], [MINOR], [INFO]. "
+        "Be specific about file paths and line numbers. "
+        "Suggest concrete fixes for each finding.\n\n"
+    ),
+    "git_agent": (
+        "You are a Git and GitHub/GitLab operations specialist. Focus on: "
+        "repository inspection (git log, blame, diff, reflog), "
+        "branch and merge operations, "
+        "conflict resolution, "
+        "GitHub/GitLab API via gh or glab CLI, "
+        "CI/CD pipeline inspection (GitHub Actions, GitLab CI), "
+        "tag and release management. "
+        "Always show command output clearly and explain what you find.\n\n"
+    ),
+}
+
+# Per-agent model overrides. None means use the global oz_opencode_model setting.
+# Set to a model string (e.g. "opencode/big-pickle") to override for that agent type.
+AGENT_MODELS: dict[str, str | None] = {
+    "docker_agent": None,
+    "k8s_agent": None,
+    "linux_agent": None,
+    "code_review": None,
+    "git_agent": None,
+    "opencode": None,
+}
 
 FILE_OUTPUT_PREAMBLE = (
     "!!! FILE OUTPUT RULE - YOU MUST FOLLOW THIS EXACTLY !!!\n"
@@ -94,19 +168,21 @@ class LocalAgentRunner:
         prompt = self.agent_run.prompt
         agent = self.agent_run.agent_type
         fp = FILE_OUTPUT_PREAMBLE
+        sys_prompt = AGENT_SYSTEM_PROMPTS.get(agent, "")
+        full = sys_prompt + fp + (prompt or "")
 
-        if agent == "opencode":
-            return ["opencode", "run", (fp + (prompt or ""))], None
+        if agent == "opencode" or agent in SPECIALIZED_OPENCODE_AGENTS:
+            return ["opencode", "run", full], None
         elif agent == "claude-code":
             return ["claude", "--print"], fp + (prompt or "")
         elif agent == "codex":
-            return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", fp + (prompt or "")], None
+            return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", full], None
         elif agent == "gemini-cli":
-            return ["gemini", "-p", fp + (prompt or "")], None
+            return ["gemini", "-p", full], None
         elif agent == "github":
             return ["bash", "-c", prompt or ""], None
         elif agent == "commandcode":
-            return ["commandcode", "run", "--print", fp + (prompt or "")], None
+            return ["commandcode", "run", "--print", full], None
         elif agent == "custom":
             return [], fp + (prompt or "")
         return [], None
@@ -257,9 +333,9 @@ class DockerAgentRunner:
                 env_vars.setdefault("OPENAI_API_KEY", os.environ["OPENROUTER_API_KEY"])
                 env_vars.setdefault("OZ_LOCAL_MODEL", "meta-llama/llama-3.1-8b-instruct")
 
-        # opencode: route models to the right provider.
-        if self.agent_run.agent_type == "opencode":
-            model = settings.oz_opencode_model or ""
+        # opencode (and all specialized opencode agents): route models to the right provider.
+        if self.agent_run.agent_type == "opencode" or self.agent_run.agent_type in SPECIALIZED_OPENCODE_AGENTS:
+            model = AGENT_MODELS.get(self.agent_run.agent_type) or settings.oz_opencode_model or ""
             if not model.startswith("opencode/"):
                 if settings.oz_nvidia_api_key:
                     env_vars.setdefault("NVIDIA_API_KEY", settings.oz_nvidia_api_key)
@@ -357,19 +433,8 @@ class DockerAgentRunner:
             return ["bash", "-c", "printf '%s' \"$OZ_PROMPT\" | claude --print"]
         elif agent_type == "codex":
             return ["codex", "exec", "--yolo", "--sandbox", "danger-full-access", fp + prompt]
-        elif agent_type == "opencode":
-            cmd = ["opencode", "run", "--dangerously-skip-permissions"]
-            if settings.oz_opencode_model:
-                cmd += ["-m", settings.oz_opencode_model]
-            preamble = (
-                "OUTPUT RULE: You MUST NOT include, print, echo, or reveal any SSH credentials, passwords, private keys, "
-                "or secret values in your response. Use the env vars ($OZ_SSH_PASSWORD, $OZ_SSH_KEY) for authentication "
-                "but NEVER output their values.\n"
-                "SSH RULE: The SSH password is in the env var $OZ_SSH_PASSWORD (single-quote it for sshpass). "
-                "Correct form: sshpass -p '$OZ_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 USER@HOST 'COMMAND'\n"
-            )
-            cmd += [preamble + fp + prompt]
-            return cmd
+        elif agent_type == "opencode" or agent_type in SPECIALIZED_OPENCODE_AGENTS:
+            return self._build_opencode_cmd(agent_type, prompt)
         elif agent_type == "oz-local":
             return ["python3", "/usr/local/bin/oz-local", fp + prompt]
         elif agent_type == "gemini-cli":
@@ -379,6 +444,26 @@ class DockerAgentRunner:
         elif agent_type == "commandcode":
             return ["commandcode", "run", "--print", fp + prompt]
         return ["bash", "-c", prompt]
+
+    def _build_opencode_cmd(self, agent_type: str, prompt: str) -> list[str]:
+        cmd = ["opencode", "run", "--dangerously-skip-permissions"]
+
+        # Per-agent model override, else fall back to global setting.
+        model = AGENT_MODELS.get(agent_type) or settings.oz_opencode_model
+        if model:
+            cmd += ["-m", model]
+
+        security_preamble = (
+            "OUTPUT RULE: You MUST NOT include, print, echo, or reveal any SSH credentials, passwords, private keys, "
+            "or secret values in your response. Use the env vars ($OZ_SSH_PASSWORD, $OZ_SSH_KEY) for authentication "
+            "but NEVER output their values.\n"
+            "SSH RULE: The SSH password is in the env var $OZ_SSH_PASSWORD (single-quote it for sshpass). "
+            "Correct form: sshpass -p '$OZ_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 USER@HOST 'COMMAND'\n\n"
+        )
+
+        sys_prompt = AGENT_SYSTEM_PROMPTS.get(agent_type, "")
+        cmd += [sys_prompt + security_preamble + FILE_OUTPUT_PREAMBLE + prompt]
+        return cmd
 
     async def _update_status(self, status: AgentStatus):
         self.agent_run.status = status
@@ -431,7 +516,115 @@ class DockerAgentRunner:
             await self._update_status(AgentStatus.CANCELLED)
 
 
+class CloudflareDockerAgentRunner:
+    """Delegates Docker tasks to a deployed Cloudflare Worker that uses Workers AI + Docker Engine API."""
+
+    def __init__(self, agent_run: AgentRun, db: AsyncSession):
+        self.agent_run = agent_run
+        self.db = db
+
+    async def run(self):
+        await self._update_status(AgentStatus.RUNNING)
+
+        if not settings.cf_docker_agent_url:
+            await self._log("error", "CF_DOCKER_AGENT_URL is not configured. Deploy the Cloudflare Docker Agent first.")
+            await self._update_status(AgentStatus.FAILED)
+            return
+
+        # Resolve the user's registered Docker endpoint from the database.
+        from sqlalchemy import select as sa_select
+        from app.models.docker_endpoint import DockerEndpoint
+
+        result = await self.db.execute(
+            sa_select(DockerEndpoint)
+            .where(DockerEndpoint.user_id == self.agent_run.user_id)
+            .order_by(DockerEndpoint.created_at.asc())
+            .limit(1)
+        )
+        endpoint = result.scalar_one_or_none()
+
+        if not endpoint:
+            await self._log(
+                "error",
+                "No Docker endpoint registered. Go to Settings → Docker Endpoints in the Oz UI and add one."
+            )
+            await self._update_status(AgentStatus.FAILED)
+            return
+
+        payload = {
+            "task": self.agent_run.prompt or "",
+            "docker_url": endpoint.api_url,
+            "endpoint_name": endpoint.name,
+        }
+
+        worker_url = settings.cf_docker_agent_url.rstrip("/") + "/"
+        timeout = min(self.agent_run.max_runtime or 120, 300)
+
+        try:
+            await self._log("stdout", f"[cf-docker-agent] Calling Cloudflare Worker → {worker_url}")
+            await self._log("stdout", f"[cf-docker-agent] Docker endpoint: {endpoint.name} ({endpoint.api_url})")
+
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(worker_url, json=payload)
+
+            if response.status_code != 200:
+                await self._log("error", f"CF Worker returned HTTP {response.status_code}: {response.text[:500]}")
+                await self._update_status(AgentStatus.FAILED)
+                return
+
+            data = response.json()
+            output: str = data.get("output", "(no output)")
+            success: bool = data.get("success", False)
+            tool_calls: int = data.get("tool_calls", 0)
+
+            await self._log("stdout", output)
+            if tool_calls:
+                await self._log("stdout", f"[cf-docker-agent] Completed ({tool_calls} tool calls)")
+
+            self.agent_run.exit_code = 0 if success else 1
+            self.agent_run.status = AgentStatus.COMPLETED if success else AgentStatus.FAILED
+            self.agent_run.finished_at = datetime.now(timezone.utc)
+            await self.db.commit()
+
+        except httpx.TimeoutException:
+            await self._log("error", f"CF Worker timed out after {timeout}s")
+            await self._update_status(AgentStatus.FAILED)
+        except Exception as e:
+            await self._log("error", f"{type(e).__name__}: {e}")
+            for line in traceback.format_exc().splitlines():
+                await self._log("error", line)
+            await self._update_status(AgentStatus.FAILED)
+
+    async def _update_status(self, status: AgentStatus):
+        self.agent_run.status = status
+        if status == AgentStatus.RUNNING:
+            self.agent_run.started_at = datetime.now(timezone.utc)
+        elif status in (AgentStatus.COMPLETED, AgentStatus.FAILED, AgentStatus.CANCELLED):
+            self.agent_run.finished_at = datetime.now(timezone.utc)
+        await self.db.commit()
+
+    async def _log(self, stream: str, content: str):
+        log = AgentLog(agent_run_id=self.agent_run.id, stream=stream, content=content)
+        self.db.add(log)
+        await self.db.commit()
+        await self._broadcast(stream, content)
+
+    async def _broadcast(self, stream: str, content: str):
+        ws = active_sessions.get(self.agent_run.id)
+        if ws:
+            try:
+                ts = datetime.now(timezone.utc).isoformat()
+                await ws.send_json({"stream": stream, "content": content, "timestamp": ts})
+            except Exception:
+                active_sessions.pop(self.agent_run.id, None)
+
+    async def cancel(self):
+        await self._update_status(AgentStatus.CANCELLED)
+
+
 def get_runner(agent_run: AgentRun, db: AsyncSession):
+    if agent_run.agent_type == "cloudflare_docker_agent":
+        return CloudflareDockerAgentRunner(agent_run, db)
     if settings.oz_runner == "docker":
         return DockerAgentRunner(agent_run, db)
     return LocalAgentRunner(agent_run, db)

@@ -86,7 +86,8 @@ const LLM_PROVIDERS_MAP = {
   [LLMProviders.Cerebras]: 'cerebras-llm-provider',
   [LLMProviders.HuggingFace]: 'huggingface-llm-provider',
   [LLMProviders.Ollama]: 'ollama-llm-provider',
-  [LLMProviders.CommandCode]: 'commandcode-llm-provider'
+  [LLMProviders.CommandCode]: 'commandcode-llm-provider',
+  [LLMProviders.Cloudflare]: 'cloudflare-llm-provider'
 }
 const DEFAULT_MAX_EXECUTION_RETRIES = 2
 const DEFAULT_REMOTE_PROVIDER_ERROR_RETRIES = 1
@@ -2610,7 +2611,8 @@ export default class LLMProvider {
           LLMProviders.MoonshotAI,
           LLMProviders.Cerebras,
           LLMProviders.HuggingFace,
-          LLMProviders.Ollama
+          LLMProviders.Ollama,
+          LLMProviders.Cloudflare
         ].includes(providerName)
       ) {
         const normalized = this.normalizeCompletionResultForOpenAICompatibleProvider(

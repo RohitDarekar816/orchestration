@@ -10,6 +10,21 @@ services:
     profiles:
       - build
 
+  # Persistent opencode server — keeps the opencode runtime warm so agent runs
+  # skip the 8-15s cold-boot cost. Each `opencode run --attach` gets a fresh
+  # isolated session but reuses the already-started process and MCP connections.
+  # Requires oz-agent image to be built first (docker compose --profile build build oz-agent).
+  oz-opencode-server:
+    image: oz-agent:latest
+    command: ["opencode", "serve"]
+    ports:
+      - "4096:4096"
+    environment:
+      - OPENAI_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_BASE_URL=https://openrouter.ai/api/v1
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+    restart: unless-stopped
+
   api:
     build:
       context: ../backend
@@ -25,6 +40,8 @@ services:
       - OZ_OPENCODE_MODEL=openai/gpt-4o-mini
       - OZ_GITHUB_TOKEN=${OZ_GITHUB_TOKEN:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OZ_OPENCODE_SERVER_URL=
+      - CF_DOCKER_AGENT_URL=${CF_DOCKER_AGENT_URL:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -106,10 +123,12 @@ services:
       LEON_PORT: "5366"
       LEON_HOST: http://0.0.0.0
       LEON_LANG: en-US
-      LEON_LLM: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+      LEON_LLM: cloudflare/@cf/meta/llama-3.1-8b-instruct-fp8-fast
       LEON_GROQ_API_KEY: ${GROQ_API_KEY}
       LEON_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       LEON_COMMANDCODE_API_KEY: ${LEON_COMMANDCODE_API_KEY}
+      LEON_CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      LEON_CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
       LEON_OVER_HTTP: "true"
       LEON_WAKE_WORD: "false"
       LEON_STT: "false"

@@ -51,7 +51,13 @@ async def launch_agent(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if req.agent_type not in ("claude-code", "codex", "gemini-cli", "opencode", "oz-local", "custom", "github"):
+    from app.services.agent_runner import SPECIALIZED_OPENCODE_AGENTS
+    _VALID_AGENTS = {
+        "claude-code", "codex", "gemini-cli", "opencode", "oz-local",
+        "custom", "github", "commandcode",
+        "cloudflare_docker_agent",
+    } | SPECIALIZED_OPENCODE_AGENTS
+    if req.agent_type not in _VALID_AGENTS:
         raise HTTPException(status_code=400, detail=f"Unsupported agent: {req.agent_type}")
 
     prompt = req.prompt

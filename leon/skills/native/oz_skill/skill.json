@@ -77,7 +77,9 @@
         "disk space check on production server",
         "check failed services on the server",
         "server status report for staging",
-        "run health check on web server"
+        "run health check on web server",
+        "what is the CPU and memory usage on the production server",
+        "show me disk usage and load average on staging"
       ]
     },
     "app_logs": {
@@ -209,7 +211,16 @@
         "check website status for https://shop.example.com",
         "is https://blog.example.com reachable",
         "check https://staging.example.com from the production server",
-        "verify https://app.example.com responds with 200"
+        "verify https://app.example.com responds with 200",
+        "can you check if server with IP 192.168.1.1 is online",
+        "is server 10.0.0.50 reachable",
+        "check if host 172.105.253.206 is up",
+        "test connectivity to server 172.16.0.1",
+        "is host 10.0.0.10 responding",
+        "verify 192.168.0.1 is online",
+        "check if remote server 10.0.0.1 is reachable",
+        "ping server 192.168.1.100 to see if it responds",
+        "is the server at 10.0.0.5 alive"
       ]
     },
     "list_agents": {

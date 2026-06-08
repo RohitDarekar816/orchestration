@@ -82,7 +82,7 @@ build_images() {
 # ── Start ─────────────────────────────────────────────────────────────────────
 start_services() {
     info "Starting services..."
-    docker compose -f "$DOCKER_DIR/docker-compose.yml" up -d api web worker beat db redis leon
+    docker compose -f "$DOCKER_DIR/docker-compose.yml" up -d api web worker beat db redis leon oz-opencode-server
     info "Waiting for API to be healthy..."
     for i in $(seq 1 30); do
         if docker compose -f "$DOCKER_DIR/docker-compose.yml" exec -T api \
@@ -93,6 +93,23 @@ start_services() {
     done
     # Give the API a moment to finish init_db
     sleep 5
+
+    # Wait for the opencode warm server to accept connections (up to 60s).
+    info "Waiting for oz-opencode-server to be ready..."
+    for i in $(seq 1 30); do
+        if curl -sf --max-time 2 http://localhost:4096 &>/dev/null 2>&1 || \
+           curl -sf --max-time 2 http://localhost:4096/health &>/dev/null 2>&1; then
+            info "oz-opencode-server is ready."
+            break
+        fi
+        # Also accept TCP-open as "ready" (opencode serve may not return HTTP 200 on /).
+        if nc -z localhost 4096 &>/dev/null 2>&1; then
+            info "oz-opencode-server is ready (port open)."
+            break
+        fi
+        sleep 2
+    done
+
     info "Services started."
 }
 

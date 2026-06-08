@@ -15,12 +15,23 @@ export const run: ActionFunction = async function (params) {
   const settings = new Settings()
   const network = new Network()
 
-  const url = (params.action_arguments?.url as string) || (params.action_arguments?.domain as string) || params.utterance || ''
+  const rawTarget = (params.action_arguments?.url as string) || (params.action_arguments?.domain as string) || ''
   const serverName = (params.action_arguments?.server as string) || ''
   const agentType = ((await settings.get('default_agent_type')) as string) || 'oz-local'
 
+  // Extract bare IP or domain from the utterance if the LLM didn't parse one.
+  let url = rawTarget
   if (!url) {
-    await leon.answer({ key: 'error', data: { message: 'No URL provided.' } })
+    const ipMatch = (params.utterance || '').match(/\b(\d{1,3}(?:\.\d{1,3}){3})\b/)
+    const domainMatch = (params.utterance || '').match(/\bhttps?:\/\/\S+/)
+    url = ipMatch ? ipMatch[1] : (domainMatch ? domainMatch[0] : params.utterance || '')
+  }
+
+  // Normalise bare IPs/hostnames to a pingable/curl-able form.
+  const normalizedUrl = /^https?:\/\//i.test(url) ? url : url
+
+  if (!url) {
+    await leon.answer({ key: 'error', data: { message: 'No URL or IP provided.' } })
     return
   }
 
@@ -44,23 +55,27 @@ export const run: ActionFunction = async function (params) {
 Connection: OZ_SSH_* env vars, key at /tmp/oz_ssh_key (already written by entrypoint).`
       : `Run all commands on the local machine.`
 
-    const prompt = `You are a website monitoring tool. ${target}
+    const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(url.trim())
+    const prompt = isIp
+      ? `Check if the server at IP ${url} is reachable. ${target}
 
-Check the website status for the following URL: ${url}
+Run these checks:
+1. Ping test: \`ping -c 3 -W 2 ${url} 2>&1 || echo "ping failed"\`
+2. TCP port 80: \`nc -zv -w3 ${url} 80 2>&1 || echo "port 80 closed"\`
+3. TCP port 443: \`nc -zv -w3 ${url} 443 2>&1 || echo "port 443 closed"\`
+4. HTTP check: \`curl -o /dev/null -s -w "HTTP %{http_code} in %{time_total}s" --connect-timeout 5 http://${url} 2>&1 || echo "HTTP unreachable"\`
 
-Run these checks in order:
-1. HTTP status: \`curl -o /dev/null -s -w "HTTP %{http_code} - %{time_total}s\\n" '${url}'\`
-2. Response headers: \`curl -sI --connect-timeout 10 '${url}' | head -20\`
-3. DNS resolution: \`host '${url}' 2>/dev/null || nslookup '${url}' 2>/dev/null || echo "DNS tools not available"\`
+Give a concise verdict: is the server UP or DOWN, which ports are open, and response time. One short paragraph.`
+      : `You are a website monitoring tool. ${target}
 
-Report:
-- Whether the site is UP or DOWN
-- HTTP status code
-- Response time
-- Any redirect chain
-- DNS resolution info
+Check the status of: ${url}
 
-If the curl command fails entirely, report the site as DOWN with the error message.`
+Run these checks:
+1. HTTP status: \`curl -o /dev/null -s -w "HTTP %{http_code} - %{time_total}s\\n" --connect-timeout 10 '${url}'\`
+2. Response headers: \`curl -sI --connect-timeout 10 '${url}' | head -15\`
+3. DNS: \`host '${url}' 2>/dev/null || nslookup '${url}' 2>/dev/null || echo "DNS tools not available"\`
+
+Give a concise verdict: UP or DOWN, HTTP status code, response time, and any redirect. One short paragraph.`
 
     const { output, status, agentId } = await launchAndWait({
       apiUrl: cfg.apiUrl,

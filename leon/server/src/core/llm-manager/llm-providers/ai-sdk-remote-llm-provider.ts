@@ -519,6 +519,13 @@ export default class AISDKRemoteLLMProvider {
     }
 
     if (this.config.flavor === 'groq') {
+      // Only Groq reasoning models (qwq, deepseek-r1) support reasoning_effort.
+      // Non-reasoning models (llama, mixtral, gemma, etc.) reject this parameter.
+      const isGroqReasoningModel = /qwq|deepseek.?r1/i.test(this.model)
+      if (!isGroqReasoningModel) {
+        return {}
+      }
+
       if (reasoningMode === 'off') {
         return {
           groq: {

@@ -28,8 +28,22 @@ class Settings(BaseSettings):
     oz_nvidia_api_key: str = ""
     oz_github_token: str = ""
 
-    allowed_agents: list[str] = ["claude-code", "codex", "gemini-cli", "opencode", "custom", "github", "commandcode"]
+    allowed_agents: list[str] = [
+        "claude-code", "codex", "gemini-cli", "opencode", "custom", "github",
+        "commandcode", "oz-local",
+        # Specialized opencode-based agents (system prompt injected per type)
+        "docker_agent", "k8s_agent", "linux_agent", "code_review", "git_agent",
+        # Cloudflare edge agents
+        "cloudflare_docker_agent",
+    ]
     oz_commandcode_api_key: str = ""
+    # URL of a persistent `opencode serve` instance to attach to instead of cold-starting.
+    # Eliminates per-run startup overhead. Leave empty to use cold-start (default).
+    oz_opencode_server_url: str = ""
+
+    # Cloudflare Docker Agent — deployed Worker URL.
+    # Set to the wrangler-deployed URL, e.g. https://cf-docker-agent.<account>.workers.dev
+    cf_docker_agent_url: str = ""
 
 
 @lru_cache

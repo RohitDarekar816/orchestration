@@ -220,7 +220,10 @@ export default class NLU {
 
     try {
       const greetingPattern = /^(hello|hi|hey|greetings|good morning|good (evening|afternoon)|howdy|what'?s up|sup|how are you|how'?s it going)\b/i
-      if (greetingPattern.test(utterance.trim())) {
+      const infraKeywords = ['docker','container','server','bash','shell','ssh','deploy','systemctl','service','network','disk','memory','cpu','port','nginx','ip','host','online','reachable','alive','ping','check if','is it up','is it down','check server','check website','health','log','process','firewall','mount','database','db','redis','postgres']
+      const utteranceLowerForGreeting = (typeof utterance === 'string' ? utterance : String(utterance)).toLowerCase()
+      const hasInfraKeyword = infraKeywords.some(kw => utteranceLowerForGreeting.includes(kw))
+      if (greetingPattern.test(utterance.trim()) && !hasInfraKeyword) {
         LogHelper.success('Greeting detected — routing directly to introduction_skill')
         return 'introduction_skill' as NLPSkill
       }

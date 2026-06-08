@@ -41,6 +41,7 @@ export interface LaunchResult {
 const ANSI_RE = /\x1b\[[0-9;]*[a-zA-Z]/g
 
 const NOISE_PATTERNS: RegExp[] = [
+  // Package manager noise
   /^Reading package lists/,
   /^Building dependency tree/,
   /^Setting up /,
@@ -55,6 +56,20 @@ const NOISE_PATTERNS: RegExp[] = [
   /^sqlite-migration/,
   /^Database migration complete/,
   /^The `oz` CLI/,
+
+  // Opencode TUI progress lines (tool trace, not the AI's response)
+  /^> /,             // > build · model-name, > Edit file.ts, > Read config.yml
+  /^← /,             // ← Read  (unicode left-arrow file operation)
+  /^→ /,             // → Write (unicode right-arrow file operation)
+  /^Wrote file/,     // "Wrote file successfully."
+  /^Write /,         // "Write config.yml"
+  /^\$ /,            // $ cmd  (opencode echoes each bash command it runs)
+
+  // System-prompt content leaking through ps aux / process listings
+  /--dangerously-skip-permissions/,
+  /OUTPUT RULE:/,
+  /SSH RULE:/,
+  /FILE OUTPUT RULE/,
 ]
 
 /**
@@ -299,7 +314,8 @@ export async function launchAndWait(opts: {
   const agentId = launchRes.data.id
   const startMs = Date.now()
   const deadline = startMs + maxPollSeconds * 1000
-  let interval = 3000
+  // Start polling fast (1s) to catch quick tasks early, then back off to 15s max.
+  let interval = 1000
   let lastProgressMs = startMs
 
   while (Date.now() < deadline) {

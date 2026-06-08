@@ -79,6 +79,12 @@ export const LLM_PROVIDER_ACCOUNT_CONFIGS: ReadonlyArray<LLMProviderAccountConfi
       value: LLMProviders.CommandCode,
       apiKeyEnv: 'LEON_COMMANDCODE_API_KEY',
       apiKeyURL: 'https://commandcode.ai/settings/api-keys'
+    },
+    {
+      label: 'Cloudflare Workers AI',
+      value: LLMProviders.Cloudflare,
+      apiKeyEnv: 'LEON_CLOUDFLARE_API_TOKEN',
+      apiKeyURL: 'https://dash.cloudflare.com/profile/api-tokens'
     }
   ])
 

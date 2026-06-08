@@ -38,7 +38,8 @@ export enum LLMProviders {
   Cerebras = 'cerebras',
   HuggingFace = 'huggingface',
   Ollama = 'ollama',
-  CommandCode = 'commandcode'
+  CommandCode = 'commandcode',
+  Cloudflare = 'cloudflare'
 }
 
 export enum ActionCallingStatus {
