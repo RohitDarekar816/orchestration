@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -108,6 +109,37 @@ async def update_endpoint(
     await db.commit()
     await db.refresh(ep)
     return _serialize(ep)
+
+
+class DockerTestRequest(BaseModel):
+    api_url: str
+
+
+@router.post("/test")
+async def test_endpoint(
+    req: DockerTestRequest,
+    user: User = Depends(get_current_user),
+):
+    """Proxy a connectivity check to the Docker Engine API (avoids browser CORS)."""
+    url = req.api_url.rstrip("/") + "/info"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            r = await client.get(url)
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Docker API returned HTTP {r.status_code}")
+        info = r.json()
+        return {
+            "ok": True,
+            "server_version": info.get("ServerVersion", "?"),
+            "containers": info.get("Containers", "?"),
+            "containers_running": info.get("ContainersRunning", "?"),
+            "os": info.get("OperatingSystem", "?"),
+            "architecture": info.get("Architecture", "?"),
+        }
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Connection timed out after 8 seconds")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Connection failed: {e}")
 
 
 @router.delete("/{endpoint_id}", status_code=204)

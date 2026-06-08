@@ -48,6 +48,7 @@
           <a href="#" onclick="showPage('skills')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="skills">Skills</a>
           <a href="#" onclick="showPage('schedules')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="schedules">Schedules</a>
           <a href="#" onclick="showPage('servers')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="servers">Servers</a>
+          <a href="#" onclick="showPage('docker-endpoints')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="docker-endpoints">Docker Endpoints</a>
           <a href="#" onclick="showPage('secrets')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="secrets">Secrets</a>
           <a href="#" onclick="showPage('chat')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="chat">Chat</a>
         </nav>
@@ -269,6 +270,7 @@ function showPage(page) {
     skills: renderSkills,
     schedules: renderSchedules,
     servers: renderServers,
+    'docker-endpoints': renderDockerEndpoints,
     secrets: renderSecrets,
     chat: renderChat,
   };
@@ -1057,6 +1059,202 @@ async function deleteSecret(id) {
   renderSecrets();
 }
 
+// --- Docker Endpoints ---
+
+async function renderDockerEndpoints() {
+  const el = document.getElementById('page-content');
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to manage Docker endpoints.</p>'; return; }
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
+  try {
+    const endpoints = await api('GET', '/docker-endpoints');
+    el.innerHTML = `
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Docker Endpoints</h1>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Register Docker Engine API URLs for the Cloudflare Docker Agent to connect to.</p>
+        </div>
+        <button onclick="showCreateDockerEndpoint()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm font-medium">+ Add Endpoint</button>
+      </div>
+
+      <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6 text-sm">
+        <div class="font-medium text-blue-800 dark:text-blue-300 mb-1">How to expose the Docker Engine API</div>
+        <div class="text-blue-700 dark:text-blue-400 space-y-1">
+          <div>1. Edit <code class="bg-blue-100 dark:bg-blue-800/50 px-1 rounded">/lib/systemd/system/docker.service</code> — add <code class="bg-blue-100 dark:bg-blue-800/50 px-1 rounded">-H tcp://0.0.0.0:2375</code> to the ExecStart line.</div>
+          <div>2. Reload: <code class="bg-blue-100 dark:bg-blue-800/50 px-1 rounded">systemctl daemon-reload &amp;&amp; systemctl restart docker</code></div>
+          <div>3. Register the URL below, e.g. <code class="bg-blue-100 dark:bg-blue-800/50 px-1 rounded">http://your-server.example.com:2375</code></div>
+          <div class="text-orange-700 dark:text-orange-400 font-medium">⚠ Restrict access with a firewall rule — only allow Cloudflare IP ranges or use a TLS reverse proxy.</div>
+        </div>
+      </div>
+
+      <div id="docker-endpoint-form"></div>
+
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-left">
+            <tr>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Name</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">API URL</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Description</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Added</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${endpoints.length === 0
+              ? '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No Docker endpoints registered yet. Click <strong>+ Add Endpoint</strong> to add one.</td></tr>'
+              : endpoints.map(ep => `
+                <tr class="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">${escapeHtml(ep.name)}</td>
+                  <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300 text-xs">${escapeHtml(ep.api_url)}</td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400">${ep.description ? escapeHtml(ep.description) : '<span class="italic">—</span>'}</td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">${new Date(ep.created_at).toLocaleString()}</td>
+                  <td class="px-4 py-3 flex items-center gap-3">
+                    <button onclick="testDockerEndpoint('${escapeHtml(ep.api_url)}')" class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 text-sm">Test</button>
+                    <button onclick="showEditDockerEndpoint(${ep.id})" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm">Edit</button>
+                    <button onclick="deleteDockerEndpoint(${ep.id})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm">Delete</button>
+                  </td>
+                </tr>
+              `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
+  }
+}
+
+function showCreateDockerEndpoint() {
+  renderDockerEndpointForm(null);
+}
+
+async function showEditDockerEndpoint(id) {
+  try {
+    const ep = await api('GET', `/docker-endpoints/${id}`);
+    renderDockerEndpointForm(ep);
+  } catch (e) {
+    alert('Error loading endpoint: ' + e.message);
+  }
+}
+
+function renderDockerEndpointForm(ep) {
+  const isEdit = !!ep;
+  const el = document.getElementById('docker-endpoint-form');
+  el.innerHTML = `
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-5">
+      <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-4">${isEdit ? 'Edit Endpoint' : 'Add Docker Endpoint'}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name <span class="text-red-500">*</span></label>
+          <input id="dep-name" type="text" placeholder="e.g. prod-docker" value="${isEdit ? escapeHtml(ep.name) : ''}"
+            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Docker Engine API URL <span class="text-red-500">*</span></label>
+          <input id="dep-url" type="url" placeholder="http://your-server.example.com:2375" value="${isEdit ? escapeHtml(ep.api_url) : ''}"
+            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm font-mono">
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+        <input id="dep-desc" type="text" placeholder="Optional — e.g. Production server Docker" value="${isEdit ? escapeHtml(ep.description || '') : ''}"
+          class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div id="dep-form-error" class="hidden mb-3 text-sm text-red-600 dark:text-red-400"></div>
+      <div class="flex gap-2">
+        <button onclick="${isEdit ? `doEditDockerEndpoint(${ep.id})` : 'doCreateDockerEndpoint()'}"
+          class="px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600">
+          ${isEdit ? 'Update Endpoint' : 'Save Endpoint'}
+        </button>
+        <button onclick="cancelDockerEndpointForm()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
+  document.getElementById('dep-name').focus();
+}
+
+function cancelDockerEndpointForm() {
+  document.getElementById('docker-endpoint-form').innerHTML = '';
+}
+
+function gatherDockerEndpointData() {
+  const name = document.getElementById('dep-name').value.trim();
+  const api_url = document.getElementById('dep-url').value.trim();
+  const description = document.getElementById('dep-desc').value.trim() || null;
+  const errEl = document.getElementById('dep-form-error');
+  if (!name || !api_url) {
+    errEl.textContent = 'Name and API URL are required.';
+    errEl.classList.remove('hidden');
+    return null;
+  }
+  errEl.classList.add('hidden');
+  return { name, api_url, description };
+}
+
+async function doCreateDockerEndpoint() {
+  const data = gatherDockerEndpointData();
+  if (!data) return;
+  try {
+    await api('POST', '/docker-endpoints', data);
+    cancelDockerEndpointForm();
+    renderDockerEndpoints();
+  } catch (e) {
+    const errEl = document.getElementById('dep-form-error');
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function doEditDockerEndpoint(id) {
+  const data = gatherDockerEndpointData();
+  if (!data) return;
+  try {
+    await api('PATCH', `/docker-endpoints/${id}`, data);
+    cancelDockerEndpointForm();
+    renderDockerEndpoints();
+  } catch (e) {
+    const errEl = document.getElementById('dep-form-error');
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function deleteDockerEndpoint(id) {
+  if (!confirm('Delete this Docker endpoint? The Cloudflare Docker Agent will no longer be able to connect to it.')) return;
+  try {
+    await api('DELETE', `/docker-endpoints/${id}`);
+    renderDockerEndpoints();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function testDockerEndpoint(apiUrl) {
+  const overlay = document.getElementById('dep-test-overlay');
+  const result = document.getElementById('dep-test-result');
+  const title = document.getElementById('dep-test-title');
+  title.textContent = apiUrl;
+  result.textContent = 'Testing connection…';
+  result.className = 'p-3 rounded-lg text-sm font-mono bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200';
+  overlay.classList.remove('hidden');
+
+  try {
+    // Proxied through the backend to avoid browser CORS restrictions.
+    const info = await api('POST', '/docker-endpoints/test', { api_url: apiUrl });
+    result.className = 'p-3 rounded-lg text-sm font-mono bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300';
+    result.textContent = `✓ Connected\nDocker version: ${info.server_version}\nContainers: ${info.containers} (${info.containers_running} running)\nOS: ${info.os} / ${info.architecture}`;
+  } catch (e) {
+    result.className = 'p-3 rounded-lg text-sm font-mono bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300';
+    result.textContent = `✗ ${e.message}\n\nMake sure the Docker Engine API is reachable from the Oz server.\nThe Cloudflare Worker also needs to reach this URL from Cloudflare's edge.`;
+  }
+}
+
+function closeDepTestOverlay() {
+  document.getElementById('dep-test-overlay').classList.add('hidden');
+}
+
 // --- Chat ---
 
 async function renderChat() {
@@ -1099,6 +1297,26 @@ render();
       <button onclick="closeFileViewer()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
     </div>
     <pre id="file-viewer-content" class="flex-1 p-6 overflow-y-auto text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all"></pre>
+  </div>
+</div>
+
+<!-- Docker Endpoint Test Modal -->
+<div id="dep-test-overlay" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="closeDepTestOverlay()">
+  <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl dark:shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div>
+        <h3 class="font-semibold text-gray-900 dark:text-gray-100 text-sm">Test Docker Connection</h3>
+        <p id="dep-test-title" class="font-mono text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-xs"></p>
+      </div>
+      <button onclick="closeDepTestOverlay()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+    </div>
+    <div class="px-6 py-5">
+      <div id="dep-test-result" class="p-3 rounded-lg text-sm font-mono bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 whitespace-pre-wrap"></div>
+      <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">This test runs from the Oz server (not your browser), so it reflects whether the Docker API is reachable from the same machine. The Cloudflare Worker will call this URL from Cloudflare's edge — make sure it is publicly accessible.</p>
+    </div>
+    <div class="px-6 pb-5">
+      <button onclick="closeDepTestOverlay()" class="w-full py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">Close</button>
+    </div>
   </div>
 </div>
 
