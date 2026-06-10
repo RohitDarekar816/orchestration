@@ -377,7 +377,7 @@ async def download_agent_file(
     )
 
 
-async def _run_agent_in_background(agent_id: int, _db: AsyncSession, _max_auto_retries: int = 2):
+async def _run_agent_in_background(agent_id: int, _db: AsyncSession, _max_auto_retries: int = 0):
     import traceback
 
     from app.core.database import async_session as new_session

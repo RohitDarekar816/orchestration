@@ -66,8 +66,8 @@ export default {
 Rules:
 - ALWAYS call a tool to get real data. Never guess or fabricate container names, IDs, or status.
 - For listing tasks: call list_containers or list_images, then summarise the real results.
-- For log tasks: call get_container_logs.
-- Be concise — a short paragraph or a bullet list. No filler text.
+- For log tasks: call get_container_logs with the exact tail count the user requested. Then output EVERY log line verbatim — do NOT summarise, truncate, or paraphrase log lines.
+- For counts or status: a short paragraph or bullet list is fine.
 - If a tool returns an error, report it exactly.`
 
     const messages: Message[] = [
@@ -105,7 +105,7 @@ Rules:
             messages.push({
               role: 'tool',
               tool_call_id: call.id,
-              content: JSON.stringify(toolResult).slice(0, 8000),
+              content: JSON.stringify(toolResult).slice(0, 20000),
             })
           }
         } else {

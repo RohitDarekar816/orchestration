@@ -14,7 +14,8 @@
     "For quick bash/shell commands → call run_bash",
     "For server CPU/memory/disk/load → call server_health",
     "For application or system log inspection → call app_logs",
-    "For Docker container count, listing containers, container logs, or container status → call docker_logs",
+    "For Docker containers on THIS machine or an SSH-connected server (not a named remote Docker endpoint) → call docker_logs",
+    "For Docker operations on a remote Docker API endpoint registered in Oz (e.g. 'linode', 'vps', 'prod-docker') → call docker_logs — it auto-detects Docker endpoints and routes correctly",
     "For deploying a project (git pull, install, restart) → call deploy",
     "For listing registered servers → call list_servers",
     "For checking if a website is up/down → call check_website",
@@ -105,7 +106,7 @@
     },
     "docker_logs": {
       "type": "logic",
-      "description": "Get Docker container logs, status, count, and health. Use for counting how many containers are running, listing containers, or checking container-specific logs. For general server health (CPU/memory/disk) use server_health.",
+      "description": "Get Docker container logs, status, count, and health. Use for Docker operations on THIS machine, an SSH-connected server, or a named remote Docker endpoint registered in Oz (like 'linode', 'vps', 'prod-docker'). Automatically detects whether the named server is a Docker API endpoint and routes accordingly. For general server health (CPU/memory/disk) use server_health.",
       "parameters": {
         "server": { "type": "string", "description": "Target server name for Docker operations. Empty means local machine." },
         "container": { "type": "string", "description": "Container name to inspect." },
@@ -127,7 +128,11 @@
         "list docker containers on staging",
         "check docker containers on AIT5252",
         "show running containers on the server",
-        "count docker containers on production"
+        "count docker containers on production",
+        "how many docker containers are running on linode",
+        "check containers on linode",
+        "list containers on the vps",
+        "how many containers are running on my docker endpoint"
       ]
     },
     "deploy": {

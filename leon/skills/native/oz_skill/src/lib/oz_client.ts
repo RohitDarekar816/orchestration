@@ -30,6 +30,13 @@ export interface ServerSummary {
   description: string | null
 }
 
+export interface DockerEndpointSummary {
+  id: number
+  name: string
+  api_url: string
+  description: string | null
+}
+
 export interface LaunchResult {
   output: string
   status: string
@@ -64,6 +71,9 @@ const NOISE_PATTERNS: RegExp[] = [
   /^Wrote file/,     // "Wrote file successfully."
   /^Write /,         // "Write config.yml"
   /^\$ /,            // $ cmd  (opencode echoes each bash command it runs)
+
+  // CF Docker Agent status lines (debug/trace, not the AI answer)
+  /^\[cf-docker-agent\]/,
 
   // System-prompt content leaking through ps aux / process listings
   /--dangerously-skip-permissions/,
@@ -265,6 +275,212 @@ export async function findServerInUtterance(
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const re = new RegExp(`\\b${escaped}\\b`, 'i')
     if (re.test(lowerUtterance)) return server
+  }
+  return null
+}
+
+// ── Docker target resolution ──────────────────────────────────────────────────
+
+/**
+ * The result of resolving who the user wants to run Docker commands against.
+ * - endpoint: a registered Docker API endpoint (routes to cloudflare_docker_agent)
+ * - ssh_server: an SSH-connected server registered in Oz (routes to oz-local)
+ * - local: the Docker daemon on this machine (routes to oz-local, no SSH)
+ */
+export type DockerTarget =
+  | { kind: 'endpoint'; endpoint: DockerEndpointSummary }
+  | { kind: 'ssh_server'; server: ServerSummary }
+  | { kind: 'local' }
+
+/**
+ * Authoritative target resolver for Docker queries.
+ *
+ * Strategy (in priority order):
+ *  1. Explicit local-intent words → local immediately
+ *  2. Fetch all endpoints + SSH servers in parallel
+ *  3. Build a candidate list from: NLU hint, preposition patterns ("on X"),
+ *     capitalised words, and every word ≥4 chars in the utterance
+ *  4. For each candidate try:
+ *     a) Exact endpoint name match
+ *     b) Endpoint hostname / subdomain match (extracted from api_url)
+ *     c) Partial endpoint name match (candidate ≥ 3 chars, name contains it)
+ *     d) Exact SSH server name match
+ *     e) SSH server host match
+ *  5. Single-endpoint fallback: if no candidate matched but there is exactly
+ *     one endpoint registered and the utterance carries remote intent, use it
+ *  6. Default to local
+ */
+export async function resolveDockerTarget(
+  utterance: string,
+  nluServerHint: string,
+  apiUrl: string,
+  token: string,
+  network: Network
+): Promise<DockerTarget> {
+  const u = utterance.toLowerCase()
+
+  // 1. Explicit local intent overrides everything.
+  if (/\b(local|localhost|this\s+machine|this\s+server|here|locally|my\s+machine|my\s+computer)\b/.test(u)) {
+    return { kind: 'local' }
+  }
+
+  // 2. Fetch all endpoints + servers in parallel — one round-trip.
+  const [endpointsResult, serversResult] = await Promise.allSettled([
+    fetchDockerEndpoints(apiUrl, token, network),
+    fetchAllServers(apiUrl, token, network),
+  ])
+  const endpoints: DockerEndpointSummary[] = endpointsResult.status === 'fulfilled' ? endpointsResult.value : []
+  const servers: ServerSummary[] = serversResult.status === 'fulfilled' ? serversResult.value : []
+
+  // 3. Build candidate name list (deduped, longest first so specific matches win).
+  const candidates = buildCandidates(utterance, nluServerHint)
+
+  // 4. Try each candidate against all targets.
+  for (const candidate of candidates) {
+    const cl = candidate.toLowerCase()
+
+    // (a) Exact endpoint name
+    const epExact = endpoints.find((e) => e.name.toLowerCase() === cl)
+    if (epExact) return { kind: 'endpoint', endpoint: epExact }
+
+    // (b) Endpoint hostname / subdomain from api_url
+    const epHost = endpoints.find((e) => {
+      const hostname = extractHostname(e.api_url)
+      if (!hostname) return false
+      // "familyestate" matches "familyestate.in", "api.familyestate.in", etc.
+      return hostname === cl || hostname.startsWith(cl + '.') || hostname.endsWith('.' + cl) || hostname.includes('.' + cl + '.')
+    })
+    if (epHost) return { kind: 'endpoint', endpoint: epHost }
+
+    // (c) Partial endpoint name (candidate ≥ 3 chars and name contains it)
+    if (cl.length >= 3) {
+      const epPartial = endpoints.find((e) => e.name.toLowerCase().includes(cl))
+      if (epPartial) return { kind: 'endpoint', endpoint: epPartial }
+    }
+
+    // (d) Exact SSH server name
+    const srvExact = servers.find((s) => s.name.toLowerCase() === cl)
+    if (srvExact) return { kind: 'ssh_server', server: srvExact }
+
+    // (e) SSH server host match
+    const srvHost = servers.find((s) => s.host.toLowerCase() === cl)
+    if (srvHost) return { kind: 'ssh_server', server: srvHost }
+  }
+
+  // 5. Single-endpoint fallback when the utterance has remote intent but no
+  //    candidate matched a known name.
+  if (endpoints.length === 1 && hasRemoteIntent(u, servers)) {
+    return { kind: 'endpoint', endpoint: endpoints[0] }
+  }
+
+  // 6. Default to local Docker.
+  return { kind: 'local' }
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+async function fetchDockerEndpoints(apiUrl: string, token: string, network: Network): Promise<DockerEndpointSummary[]> {
+  try {
+    const res = await withRetry(() =>
+      network.request<DockerEndpointSummary[]>({
+        url: `${apiUrl}/docker-endpoints`,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    )
+    return Array.isArray(res.data) ? res.data : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Build a prioritised candidate list from the utterance.
+ * The NLU hint is most trusted; preposition-extracted words come next;
+ * then capitalised tokens; then all ≥4-char words (lowest priority).
+ */
+function buildCandidates(utterance: string, nluHint: string): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+
+  const add = (s: string) => {
+    const t = s.trim()
+    if (!t || t.length < 2) return
+    const k = t.toLowerCase()
+    if (!seen.has(k)) { seen.add(k); out.push(t) }
+  }
+
+  // NLU hint has highest confidence.
+  if (nluHint) add(nluHint)
+
+  // Preposition patterns: "on X", "for X", "at X", "from X", "check X",
+  //                       "inspect X", "via X", "to X"
+  const prepRe = /\b(?:on|for|at|from|check|inspect|via|to|about)\s+([a-zA-Z0-9][a-zA-Z0-9_.:-]*)/gi
+  for (const m of utterance.matchAll(prepRe)) add(m[1])
+
+  // Capitalised tokens (likely proper nouns / server names).
+  const capRe = /\b([A-Z][a-zA-Z0-9_-]{2,})\b/g
+  for (const m of utterance.matchAll(capRe)) add(m[1])
+
+  // All remaining words ≥ 4 chars (broad sweep).
+  const wordRe = /\b([a-zA-Z][a-zA-Z0-9_.-]{3,})\b/g
+  for (const m of utterance.matchAll(wordRe)) add(m[1])
+
+  return out
+}
+
+function extractHostname(url: string): string {
+  try { return new URL(url).hostname.toLowerCase() } catch { return '' }
+}
+
+/**
+ * Returns true when the utterance appears to be targeting a remote host,
+ * not the local machine.  We avoid false positives by only triggering when
+ * the utterance contains a word that is NOT a known SSH server name
+ * (those are handled by the candidate loop above).
+ */
+function hasRemoteIntent(lower: string, knownServers: ServerSummary[]): boolean {
+  // Explicit remote keywords
+  if (/\b(remote|vps|server|endpoint|cloud|production|staging|prod)\b/.test(lower)) return true
+
+  // Preposition + any word pattern ("on X", "at X", "from X") where X isn't
+  // a stopword — suggests the user named a specific host
+  const prepRe = /\b(?:on|at|from)\s+([a-zA-Z0-9][a-zA-Z0-9_.:-]+)/gi
+  for (const m of lower.matchAll(prepRe)) {
+    const candidate = m[1].toLowerCase()
+    const stopWords = new Set(['the', 'my', 'a', 'an', 'this', 'that', 'our', 'your', 'their'])
+    if (!stopWords.has(candidate)) return true
+  }
+
+  return false
+}
+
+// ── Legacy helpers (kept for backwards compat with existing callers) ──────────
+
+export async function resolveDockerEndpointByName(
+  name: string,
+  apiUrl: string,
+  token: string,
+  network: Network
+): Promise<DockerEndpointSummary | null> {
+  if (!name) return null
+  const endpoints = await fetchDockerEndpoints(apiUrl, token, network)
+  const lower = name.toLowerCase()
+  return endpoints.find((e) => e.name.toLowerCase() === lower) ?? null
+}
+
+export async function findDockerEndpointInUtterance(
+  utterance: string,
+  apiUrl: string,
+  token: string,
+  network: Network
+): Promise<DockerEndpointSummary | null> {
+  if (!utterance) return null
+  const endpoints = await fetchDockerEndpoints(apiUrl, token, network)
+  const lowerU = utterance.toLowerCase()
+  for (const ep of endpoints) {
+    const escaped = ep.name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    if (new RegExp(`\\b${escaped}\\b`, 'i').test(lowerU)) return ep
   }
   return null
 }

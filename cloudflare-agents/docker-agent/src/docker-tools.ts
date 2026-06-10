@@ -202,8 +202,21 @@ export async function executeTool(
   const base = dockerUrl.replace(/\/$/, '')
 
   switch (name) {
-    case 'list_containers':
-      return dockerGet(base, `/containers/json?all=${args.all ?? false}`)
+    case 'list_containers': {
+      const raw = await dockerGet(base, `/containers/json?all=${args.all ?? false}`) as Array<Record<string, unknown>>
+      // Slim down each container to just what the AI needs — full Docker API
+      // objects are ~2 KB each and hit the 8 KB tool-result cap with only 4 containers.
+      return raw.map((c) => ({
+        id: (c.Id as string).slice(0, 12),
+        name: (c.Names as string[])[0]?.replace(/^\//, ''),
+        image: c.Image,
+        status: c.Status,
+        state: c.State,
+        ports: (c.Ports as Array<Record<string, unknown>>)
+          .filter((p) => p.PublicPort)
+          .map((p) => `${p.PublicPort}->${p.PrivatePort}/${p.Type}`),
+      }))
+    }
 
     case 'inspect_container':
       return dockerGet(base, `/containers/${encodeURIComponent(args.id as string)}/json`)
@@ -218,8 +231,44 @@ export async function executeTool(
       return { logs: (await parseDockerLogs(buf)).slice(-6000) }
     }
 
-    case 'container_stats':
-      return dockerGet(base, `/containers/${encodeURIComponent(args.id as string)}/stats?stream=false`)
+    case 'container_stats': {
+      const s = await dockerGet(base, `/containers/${encodeURIComponent(args.id as string)}/stats?stream=false`) as Record<string, unknown>
+
+      const cpu = s.cpu_stats as Record<string, unknown>
+      const precpu = s.precpu_stats as Record<string, unknown>
+      const cpuUsage = cpu.cpu_usage as Record<string, unknown>
+      const preCpuUsage = precpu.cpu_usage as Record<string, unknown>
+      const cpuDelta = (cpuUsage.total_usage as number) - (preCpuUsage.total_usage as number)
+      const sysDelta = (cpu.system_cpu_usage as number) - (precpu.system_cpu_usage as number)
+      const numCpus = (cpu.online_cpus as number) || (cpuUsage.percpu_usage as unknown[])?.length || 1
+      const cpuPct = sysDelta > 0 ? ((cpuDelta / sysDelta) * numCpus * 100).toFixed(2) : '0.00'
+
+      const mem = s.memory_stats as Record<string, unknown>
+      const memUsage = (mem.usage as number) - ((mem.stats as Record<string, number>)?.cache ?? 0)
+      const memLimit = mem.limit as number
+      const memPct = memLimit > 0 ? ((memUsage / memLimit) * 100).toFixed(1) : '0.0'
+      const toMB = (b: number) => b >= 1073741824 ? `${(b / 1073741824).toFixed(2)} GB` : `${(b / 1048576).toFixed(1)} MB`
+
+      const nets = s.networks as Record<string, Record<string, number>> | undefined
+      const netRx = nets ? Object.values(nets).reduce((a, n) => a + n.rx_bytes, 0) : 0
+      const netTx = nets ? Object.values(nets).reduce((a, n) => a + n.tx_bytes, 0) : 0
+      const toKB = (b: number) => b >= 1048576 ? `${(b / 1048576).toFixed(2)} MB` : `${(b / 1024).toFixed(1)} KB`
+
+      const blkio = s.blkio_stats as Record<string, unknown>
+      const blkEntries = (blkio?.io_service_bytes_recursive as Array<Record<string, unknown>>) ?? []
+      const blkRead = blkEntries.filter(e => e.op === 'read').reduce((a, e) => a + (e.value as number), 0)
+      const blkWrite = blkEntries.filter(e => e.op === 'write').reduce((a, e) => a + (e.value as number), 0)
+
+      const pids = (s.pids_stats as Record<string, number>)?.current ?? 0
+
+      return {
+        cpu_percent: `${cpuPct}%`,
+        memory: { used: toMB(memUsage), limit: toMB(memLimit), percent: `${memPct}%` },
+        network: { rx: toKB(netRx), tx: toKB(netTx) },
+        block_io: { read: toMB(blkRead), write: toMB(blkWrite) },
+        pids,
+      }
+    }
 
     case 'run_container': {
       const body: Record<string, unknown> = { Image: args.image }

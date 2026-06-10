@@ -9,6 +9,7 @@ import {
   getOzConfig,
   getToken,
   launchAndWait,
+  resolveDockerTarget,
   resolveServerByName,
 } from '../lib/oz_client'
 
@@ -33,19 +34,21 @@ const AGENT_TYPE_LABELS: Record<string, string> = {
 
 /**
  * Infer the most appropriate specialized agent type from the user's utterance.
- * Falls back to defaultType when no keywords match.
+ * Docker queries are intentionally excluded here — they are resolved by
+ * resolveDockerTarget() at run time so the right backend (CF agent vs SSH)
+ * is chosen based on registered endpoints, not static keyword matching.
  */
-function detectAgentType(utterance: string, defaultType: string): string {
+function detectNonDockerAgentType(utterance: string, defaultType: string): string | null {
   const u = utterance.toLowerCase()
   if (/\b(kubectl|kubernetes|k8s|helm|pod|pods|namespace|ingress|configmap|statefulset|daemonset|replicaset)\b/.test(u)) return 'k8s_agent'
-  if (/\b(docker|container|containers|compose|dockerfile|registry|docker\s*ps|docker\s*logs)\b/.test(u)) {
-    // Route to Cloudflare Docker agent when it is set as default, otherwise use local docker_agent.
-    return defaultType === 'cloudflare_docker_agent' ? 'cloudflare_docker_agent' : 'docker_agent'
-  }
   if (/\b(code\s*review|pull\s*request|security\s*audit|code\s*quality|vulnerability|vulnerabilities|lint|static\s*analysis)\b/.test(u)) return 'code_review'
   if (/\b(git\s|github|gitlab|commit|branch|merge\s|rebase|repository|repo)\b/.test(u)) return 'git_agent'
   if (/\b(cpu|memory|ram|disk\s|systemctl|journalctl|kernel|cron|firewall|iptables|ufw|process\s)\b/.test(u)) return 'linux_agent'
-  return defaultType
+  return null
+}
+
+function isDockerQuery(utterance: string): boolean {
+  return /\b(docker|container|containers|compose|dockerfile|registry|docker\s*ps|docker\s*logs)\b/i.test(utterance)
 }
 
 const FILE_RE = /\[FILE:([^\]]+)\]\s*\n?([\s\S]*?)\n?\[\/FILE\]/gi
@@ -134,12 +137,21 @@ export const run: ActionFunction = async function (params) {
 
   const serverName = (params.action_arguments?.server as string) || ''
   const defaultAgentType = ((await settings.get('default_agent_type')) as string) || 'oz-local'
-  const agentType = detectAgentType(params.utterance || prompt, defaultAgentType)
   const maxRuntime = Number((await settings.get('default_max_runtime')) as string) || 300
 
   try {
     const cfg = await getOzConfig(settings)
     const token = await getToken(cfg, network)
+
+    // Resolve agent type: Docker queries use resolveDockerTarget for authoritative
+    // routing; all other agent types use keyword matching.
+    let agentType: string
+    if (isDockerQuery(params.utterance || prompt)) {
+      const dockerTarget = await resolveDockerTarget(params.utterance || prompt, serverName, cfg.apiUrl, token, network)
+      agentType = dockerTarget.kind === 'endpoint' ? 'cloudflare_docker_agent' : 'docker_agent'
+    } else {
+      agentType = detectNonDockerAgentType(params.utterance || prompt, defaultAgentType) ?? defaultAgentType
+    }
 
     // Check for GitHub repo URL in the prompt — fetch files directly if found.
     const ghMatch = prompt.match(
@@ -208,7 +220,6 @@ export const run: ActionFunction = async function (params) {
     }
 
     const agentLabel = AGENT_TYPE_LABELS[agentType] || agentType
-    console.error('[oz-launch] detected agent type:', agentType)
     await leon.answer({ key: 'launching', data: { agent_type: agentLabel } })
 
     const { output, status, agentId } = await launchAndWait({

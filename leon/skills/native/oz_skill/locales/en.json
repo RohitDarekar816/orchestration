@@ -65,16 +65,16 @@
     "docker_logs": {
       "answers": {
         "fetching_docker_logs": [
-          { "text": "Fetching Docker logs for <strong>{{ container }}</strong> on <strong>{{ server }}</strong>...", "speech": "Fetching Docker logs. One moment." }
+          { "text": "<p style=\"color:#94a3b8;font-size:13px;margin:4px 0\">🐳 Fetching Docker info for <strong>{{ container }}</strong> on <strong>{{ server }}</strong>…</p>", "speech": "Fetching Docker info. One moment." }
         ],
         "still_working": [
-          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
+          { "text": "<p style=\"color:#94a3b8;font-size:13px;margin:4px 0\">⏳ {{ message }}</p>", "speech": "Still working, please wait." }
         ],
         "docker_logs_result": [
-          { "text": "<div>{{ logs }}</div>", "speech": "Here are the Docker logs." }
+          { "text": "{{ logs }}", "speech": "Here are the Docker results." }
         ],
         "error": [
-          { "text": "Failed to fetch Docker logs: {{ message }}", "speech": "Failed to fetch Docker logs." }
+          { "text": "<div style=\"background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px 14px;color:#dc2626;font-size:13px\">❌ {{ message }}</div>", "speech": "Failed to fetch Docker info." }
         ]
       }
     },
