@@ -57,6 +57,7 @@ async def launch_agent(
         "custom", "github", "commandcode",
         "cloudflare_docker_agent",
         "cloudflare_server_health_agent",
+        "cloudflare_proxmox_agent",
     } | SPECIALIZED_OPENCODE_AGENTS
     if req.agent_type not in _VALID_AGENTS:
         raise HTTPException(status_code=400, detail=f"Unsupported agent: {req.agent_type}")

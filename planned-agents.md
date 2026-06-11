@@ -10,7 +10,8 @@ Track record of all agents planned, in-progress, and built for the Oz platform.
 
 | Category | Total | Built | In Progress | Planned |
 |---|---|---|---|---|
-| Infrastructure & Ops | 15 | 2 | 0 | 13 |
+| Infrastructure & Ops | 15 | 2 | 0 | 12 |
+| Virtualization (Proxmox) | 1 | 1 | 0 | 0 |
 | Docker & Containers | 10 | 1 | 0 | 9 |
 | Application & Deployment | 12 | 0 | 0 | 12 |
 | Database & Storage | 10 | 0 | 0 | 10 |
@@ -20,7 +21,31 @@ Track record of all agents planned, in-progress, and built for the Oz platform.
 | AI & Productivity | 10 | 0 | 0 | 10 |
 | Web & APIs | 8 | 0 | 0 | 8 |
 | CI/CD & Git | 7 | 0 | 0 | 7 |
-| **Total** | **100** | **3** | **0** | **97** |
+| Proxmox VE | 1 | 1 | 0 | 0 |
+| **Total** | **101** | **4** | **0** | **97** |
+
+---
+
+## Proxmox VE (1)
+
+| # | Agent ID | Status | Description | Leon Action |
+|---|---|---|---|---|
+| 0 | `cloudflare_proxmox_agent` | ✅ Built | Full Proxmox VE management — VMs, LXC containers, nodes, storage, cluster health, power actions | `proxmox.ts` |
+
+**13 tools:** `get_cluster_status`, `list_nodes`, `get_node_status`, `list_vms`, `get_vm_status`, `vm_action` (start/stop/shutdown/reboot/reset), `list_containers`, `get_container_status`, `container_action`, `list_storage`, `get_node_tasks`, `list_vm_snapshots`, `get_vm_config`
+
+**Setup:** Proxmox runs on port 8006 (blocked by Cloudflare Workers). Set up an nginx proxy:
+```nginx
+server {
+    listen 443 ssl;
+    server_name proxmox.yourdomain.com;
+    location / {
+        proxy_pass https://127.0.0.1:8006;
+        proxy_ssl_verify off;
+    }
+}
+```
+Then register the endpoint with `api_url: https://proxmox.yourdomain.com/api2/json` and an API token from Proxmox UI → Datacenter → Permissions → API Tokens.
 
 ---
 

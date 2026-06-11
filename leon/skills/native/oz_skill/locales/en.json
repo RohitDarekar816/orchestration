@@ -62,6 +62,22 @@
         ]
       }
     },
+    "proxmox": {
+      "answers": {
+        "fetching_proxmox": [
+          { "text": "<p style=\"color:#94a3b8;font-size:13px;margin:4px 0\">🖥️ Querying Proxmox on <strong>{{ server }}</strong>…</p>", "speech": "Querying Proxmox. One moment." }
+        ],
+        "still_working": [
+          { "text": "<p style=\"color:#94a3b8;font-size:13px;margin:4px 0\">⏳ {{ message }}</p>", "speech": "Still working, please wait." }
+        ],
+        "proxmox_result": [
+          { "text": "{{ logs }}", "speech": "Here are the Proxmox results." }
+        ],
+        "error": [
+          { "text": "<div style=\"background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px 14px;color:#dc2626;font-size:13px\">❌ {{ message }}</div>", "speech": "Failed to query Proxmox." }
+        ]
+      }
+    },
     "docker_logs": {
       "answers": {
         "fetching_docker_logs": [

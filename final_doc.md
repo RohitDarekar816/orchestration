@@ -3,8 +3,8 @@
 
 **Version:** 1.0  
 **Date:** June 2026  
-**Company:** Afintrix  
-**Contact:** info@afintrix.com
+**Company:** AIT GLOBAL INC 
+**Contact:** rohit.darekar@aitglobal.inc
 
 ---
 

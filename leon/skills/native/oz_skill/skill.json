@@ -1,272 +1,399 @@
 {
-  "$schema": "../../../schemas/skill-schemas/skill.json",
-  "name": "Oz",
-  "icon_name": "terminal-line",
-  "bridge": "nodejs",
-  "version": "1.1.0",
-  "description": "Oz platform for Linux server administration tasks: running shell commands, checking server health metrics, fetching application or Docker logs, deploying projects, launching AI agents for infrastructure automation. Also handles server diagnostics, troubleshooting, debugging, and analysis of why servers or applications are failing or slow.",
-  "author": {
-    "name": "Oz Team",
-    "url": "https://opencode.ai"
-  },
-  "action_notes": [
-    "For greetings, social chat, or non-infrastructure questions → call greet",
-    "For quick bash/shell commands → call run_bash",
-    "For server CPU/memory/disk/load → call server_health",
-    "For application or system log inspection → call app_logs",
-    "For Docker containers on THIS machine or an SSH-connected server (not a named remote Docker endpoint) → call docker_logs",
-    "For Docker operations on a remote Docker API endpoint registered in Oz (e.g. 'linode', 'vps', 'prod-docker') → call docker_logs — it auto-detects Docker endpoints and routes correctly",
-    "For deploying a project (git pull, install, restart) → call deploy",
-    "For listing registered servers → call list_servers",
-    "For checking if a website is up/down → call check_website",
-    "When a server name is mentioned, pass it as the server argument",
-    "For operational infrastructure tasks (deploy, configure, install, setup, backup, restore, migrate, monitor) → call n8n_agent",
-    "For investigative/analytical tasks (diagnose, troubleshoot, investigate, debug, analyze, find root cause) → call launch_agent",
-    "If unsure which action fits, evaluate: is the user asking to DO something (operational) or to FIGURE OUT something (investigative)? Operational → n8n_agent. Investigative → launch_agent.",
-    "If the intent is still unclear, call n8n_agent with confirmed=false to ask the user"
-  ],
-  "actions": {
-    "greet": {
-      "type": "logic",
-      "description": "Handle greetings, social questions, and anything not related to servers or infrastructure. Use for: hello, hi, how are you, what can you do, who are you, thanks, goodbye.",
-      "utterance_samples": [
-        "how are you",
-        "hello",
-        "hi there",
-        "what can you do",
-        "who are you",
-        "what are you",
-        "thank you",
-        "thanks",
-        "goodbye",
-        "good morning",
-        "what is your name"
-      ]
+    "$schema": "../../../schemas/skill-schemas/skill.json",
+    "name": "Oz",
+    "icon_name": "terminal-line",
+    "bridge": "nodejs",
+    "version": "1.1.0",
+    "description": "Oz platform for Linux server administration tasks: running shell commands, checking server health metrics, fetching application or Docker logs, deploying projects, launching AI agents for infrastructure automation. Also handles server diagnostics, troubleshooting, debugging, and analysis of why servers or applications are failing or slow.",
+    "author": {
+        "name": "Oz Team",
+        "url": "https://opencode.ai"
     },
-    "run_bash": {
-      "type": "logic",
-      "description": "Run a bash or shell command on this machine or a named server. Use for quick one-shot commands: docker ps, df -h, free -m, ls, curl, etc.",
-      "parameters": {
-        "server": { "type": "string", "description": "Target server name to run the command on. Empty means local machine." },
-        "command": { "type": "string", "description": "The bash command to execute." }
-      },
-      "optional_parameters": ["server", "command"],
-      "utterance_samples": [
-        "run docker ps",
-        "execute ls -la /var/www",
-        "check disk space with df -h",
-        "run docker ps -a on prod-web",
-        "check memory with free -m",
-        "list running processes",
-        "run uptime on the staging server",
-        "execute netstat -tlnp on db-server"
-      ]
-    },
-    "server_health": {
-      "type": "logic",
-      "description": "Check the health of a server: CPU, memory, disk, load average, and failed services. For Docker-specific status use docker_logs.",
-      "parameters": {
-        "server": { "type": "string", "description": "Target server name to check health on. Empty means local machine." }
-      },
-      "optional_parameters": ["server"],
-      "utterance_samples": [
-        "check server health",
-        "server health check on prod-web",
-        "check health of the database server",
-        "show CPU and memory usage on prod",
-        "check system resources on app-server",
-        "disk space check on production server",
-        "check failed services on the server",
-        "server status report for staging",
-        "run health check on web server",
-        "what is the CPU and memory usage on the production server",
-        "show me disk usage and load average on staging"
-      ]
-    },
-    "app_logs": {
-      "type": "logic",
-      "description": "Retrieve and inspect application or system logs from a server. Supports log file paths, service names, and keyword filtering.",
-      "parameters": {
-        "server": { "type": "string", "description": "Target server name to fetch logs from. Empty means local machine." },
-        "path": { "type": "string", "description": "Log file path or service name to inspect." },
-        "lines": { "type": "number", "description": "Number of log lines to fetch." },
-        "grep": { "type": "string", "description": "Keyword filter for log lines." }
-      },
-      "optional_parameters": ["server", "path", "lines", "grep"],
-      "utterance_samples": [
-        "show application logs",
-        "fetch nginx error logs on prod-web",
-        "get last 200 lines of /var/log/app/error.log",
-        "show logs for the api service on staging",
-        "fetch logs on production filtered by ERROR",
-        "tail the app logs on the web server",
-        "show recent errors in the application logs",
-        "get last 50 lines from /var/log/syslog on db-server"
-      ]
-    },
-    "docker_logs": {
-      "type": "logic",
-      "description": "Get Docker container logs, status, count, and health. Use for Docker operations on THIS machine, an SSH-connected server, or a named remote Docker endpoint registered in Oz (like 'linode', 'vps', 'prod-docker'). Automatically detects whether the named server is a Docker API endpoint and routes accordingly. For general server health (CPU/memory/disk) use server_health.",
-      "parameters": {
-        "server": { "type": "string", "description": "Target server name for Docker operations. Empty means local machine." },
-        "container": { "type": "string", "description": "Container name to inspect." },
-        "lines": { "type": "number", "description": "Number of log lines to fetch." },
-        "grep": { "type": "string", "description": "Keyword filter for log lines." }
-      },
-      "optional_parameters": ["server", "container", "lines", "grep"],
-      "utterance_samples": [
-        "show me docker logs for nginx",
-        "check the api container logs on prod-web",
-        "get last 100 lines of logs for the postgres container",
-        "why is the redis container crashing",
-        "show docker container status on staging",
-        "check all docker containers on the server",
-        "get logs from the web container with filter ERROR",
-        "is the nginx container running on production",
-        "how many docker containers are running on server AIT5252",
-        "how many containers are running on prod-web",
-        "list docker containers on staging",
-        "check docker containers on AIT5252",
-        "show running containers on the server",
-        "count docker containers on production",
-        "how many docker containers are running on linode",
-        "check containers on linode",
-        "list containers on the vps",
-        "how many containers are running on my docker endpoint"
-      ]
-    },
-    "deploy": {
-      "type": "logic",
-      "description": "Use ONLY for git-based project deployment: git pull, install dependencies, build, and restart a service. NOT for deploying containers or Docker images — use n8n_agent for that.",
-      "parameters": {
-        "server": { "type": "string", "description": "Target server name to deploy to. Empty means local machine." },
-        "path": { "type": "string", "description": "Project directory path on the server." },
-        "branch": { "type": "string", "description": "Git branch to deploy." },
-        "service": { "type": "string", "description": "Service name to restart after deploy." }
-      },
-      "optional_parameters": ["server", "path", "branch", "service"],
-      "utterance_samples": [
-        "deploy the project at /var/www/app on prod-web",
-        "deploy to production from the main branch",
-        "pull and restart the api service on staging",
-        "deploy /home/ubuntu/myapp to the web server",
-        "update and restart the nginx service on prod",
-        "deploy the app from branch develop on staging-server",
-        "run deployment for /opt/services/backend"
-      ]
-    },
-    "n8n_agent": {
-      "type": "logic",
-      "description": "Use for operational infrastructure tasks: deployments, configuration, installation, setup, backups, restores, migrations, monitoring, and any other concrete action on servers or containers. Routes the user's request to an external workflow that can execute it. First ask with confirmed=false, then call with confirmed=true if user agrees. For investigative/analytical tasks (diagnose, troubleshoot, debug) use launch_agent instead.",
-      "parameters": {
-        "agent_name": { "type": "string", "description": "The n8n agent name that best matches the user's request (e.g. devops, k8s, backup). Leave empty if unsure." },
-        "task": { "type": "string", "description": "The task or question to send to the n8n agent." },
-        "confirmed": { "type": "boolean", "description": "Set to false to ask the user first. Set to true only if the user already agreed to use n8n." }
-      },
-      "optional_parameters": ["agent_name", "task", "confirmed"],
-      "utterance_samples": [
-        "deploy nginx docker container with custom port 8989",
-        "deploy nginx on port 8989 and give me the container ID",
-        "deploy nginx docker container",
-        "set up a new web server",
-        "install nginx on the production server",
-        "configure monitoring for the api service",
-        "back up the database to S3",
-        "migrate the application to the new server",
-        "restore the backup from yesterday",
-        "ask the devops n8n agent to deploy nginx"
-      ]
-    },
-    "launch_agent": {
-      "type": "logic",
-      "description": "Use for investigative/analytical infrastructure tasks: diagnose why something is failing, troubleshoot errors, debug issues, analyze logs or metrics, find root causes, investigate anomalies. For concrete operational tasks (deploy, configure, install, setup, backup, monitor) use n8n_agent instead.",
-      "parameters": {
-        "prompt": { "type": "string", "description": "The full user request or task description to give to the agent." }
-      },
-      "optional_parameters": ["prompt"],
-      "utterance_samples": [
-        "investigate why the API is returning 500 errors on prod",
-        "analyse the logs and find what is causing slowdowns",
-        "troubleshoot the failing deployment on staging",
-        "debug why the service keeps restarting on prod-web",
-        "diagnose the database connection issue on the server",
-        "check why the network is slow on the database server",
-        "find out why the backup is failing",
-        "investigate the high memory usage on the web server",
-        "analyse the error logs and tell me what is wrong",
-        "why is the nginx container crashing on production",
-        "I need help with something on the server",
-        "can you handle a server task for me",
-        "help me with an infrastructure issue"
-      ]
-    },
-    "check_website": {
-      "type": "logic",
-      "description": "Check if a website is up/down from server-side. Reports HTTP status code, response time, and any errors. Can optionally check from a specific server (external perspective).",
-      "parameters": {
-        "url": { "type": "string", "description": "The website URL to check (e.g. https://example.com)." },
-        "domain": { "type": "string", "description": "Alternative to url: the domain name to check (e.g. example.com)." },
-        "server": { "type": "string", "description": "Optional server to check FROM (external perspective). Empty means check from this machine." }
-      },
-      "optional_parameters": ["url", "domain", "server"],
-      "utterance_samples": [
-        "check if https://example.com is up",
-        "is my website https://mysite.com down",
-        "monitor https://api.myapp.com/health",
-        "check website status for https://shop.example.com",
-        "is https://blog.example.com reachable",
-        "check https://staging.example.com from the production server",
-        "verify https://app.example.com responds with 200",
-        "can you check if server with IP 192.168.1.1 is online",
-        "is server 10.0.0.50 reachable",
-        "check if host 172.105.253.206 is up",
-        "test connectivity to server 172.16.0.1",
-        "is host 10.0.0.10 responding",
-        "verify 192.168.0.1 is online",
-        "check if remote server 10.0.0.1 is reachable",
-        "ping server 192.168.1.100 to see if it responds",
-        "is the server at 10.0.0.5 alive"
-      ]
-    },
-    "list_agents": {
-      "type": "logic",
-      "description": "List recent agent runs and their current status (completed, running, failed).",
-      "utterance_samples": [
-        "list recent agent runs",
-        "show me the last agent tasks",
-        "what agents have been running",
-        "show agent history"
-      ]
-    },
-    "get_agent": {
-      "type": "logic",
-      "description": "Get details, status and full output logs of a specific agent run by its ID.",
-      "utterance_samples": [
-        "get status of agent 42",
-        "show output for agent run 7",
-        "what did agent 15 do",
-        "check on agent number 3"
-      ]
-    },
-    "cancel_agent": {
-      "type": "logic",
-      "description": "Cancel a currently running agent by its ID.",
-      "utterance_samples": [
-        "cancel agent 5",
-        "stop agent run 12",
-        "kill agent number 8"
-      ]
-    },
-    "list_servers": {
-      "type": "logic",
-      "description": "List all registered servers in Oz, showing their names, hosts, and authentication type.",
-      "utterance_samples": [
-        "list my servers",
-        "show registered servers",
-        "what servers do I have",
-        "show me all available servers",
-        "which servers are configured in Oz"
-      ]
+    "action_notes": [
+        "For greetings, social chat, or non-infrastructure questions \u2192 call greet",
+        "For quick bash/shell commands \u2192 call run_bash",
+        "For server CPU/memory/disk/load \u2192 call server_health",
+        "For application or system log inspection \u2192 call app_logs",
+        "For Docker containers on THIS machine or an SSH-connected server (not a named remote Docker endpoint) \u2192 call docker_logs",
+        "For Proxmox VE operations (VMs, LXC containers, nodes, storage, cluster) \u2192 call proxmox",
+        "For Docker operations on a remote Docker API endpoint registered in Oz (e.g. 'linode', 'vps', 'prod-docker') \u2192 call docker_logs \u2014 it auto-detects Docker endpoints and routes correctly",
+        "For deploying a project (git pull, install, restart) \u2192 call deploy",
+        "For listing registered servers \u2192 call list_servers",
+        "For checking if a website is up/down \u2192 call check_website",
+        "When a server name is mentioned, pass it as the server argument",
+        "For operational infrastructure tasks (deploy, configure, install, setup, backup, restore, migrate, monitor) \u2192 call n8n_agent",
+        "For investigative/analytical tasks (diagnose, troubleshoot, investigate, debug, analyze, find root cause) \u2192 call launch_agent",
+        "If unsure which action fits, evaluate: is the user asking to DO something (operational) or to FIGURE OUT something (investigative)? Operational \u2192 n8n_agent. Investigative \u2192 launch_agent.",
+        "If the intent is still unclear, call n8n_agent with confirmed=false to ask the user"
+    ],
+    "actions": {
+        "greet": {
+            "type": "logic",
+            "description": "Handle greetings, social questions, and anything not related to servers or infrastructure. Use for: hello, hi, how are you, what can you do, who are you, thanks, goodbye.",
+            "utterance_samples": [
+                "how are you",
+                "hello",
+                "hi there",
+                "what can you do",
+                "who are you",
+                "what are you",
+                "thank you",
+                "thanks",
+                "goodbye",
+                "good morning",
+                "what is your name"
+            ]
+        },
+        "run_bash": {
+            "type": "logic",
+            "description": "Run a bash or shell command on this machine or a named server. Use for quick one-shot commands: docker ps, df -h, free -m, ls, curl, etc.",
+            "parameters": {
+                "server": {
+                    "type": "string",
+                    "description": "Target server name to run the command on. Empty means local machine."
+                },
+                "command": {
+                    "type": "string",
+                    "description": "The bash command to execute."
+                }
+            },
+            "optional_parameters": [
+                "server",
+                "command"
+            ],
+            "utterance_samples": [
+                "run docker ps",
+                "execute ls -la /var/www",
+                "check disk space with df -h",
+                "run docker ps -a on prod-web",
+                "check memory with free -m",
+                "list running processes",
+                "run uptime on the staging server",
+                "execute netstat -tlnp on db-server"
+            ]
+        },
+        "server_health": {
+            "type": "logic",
+            "description": "Check the health of a server: CPU, memory, disk, load average, and failed services. For Docker-specific status use docker_logs.",
+            "parameters": {
+                "server": {
+                    "type": "string",
+                    "description": "Target server name to check health on. Empty means local machine."
+                }
+            },
+            "optional_parameters": [
+                "server"
+            ],
+            "utterance_samples": [
+                "check server health",
+                "server health check on prod-web",
+                "check health of the database server",
+                "show CPU and memory usage on prod",
+                "check system resources on app-server",
+                "disk space check on production server",
+                "check failed services on the server",
+                "server status report for staging",
+                "run health check on web server",
+                "what is the CPU and memory usage on the production server",
+                "show me disk usage and load average on staging"
+            ]
+        },
+        "app_logs": {
+            "type": "logic",
+            "description": "Retrieve and inspect application or system logs from a server. Supports log file paths, service names, and keyword filtering.",
+            "parameters": {
+                "server": {
+                    "type": "string",
+                    "description": "Target server name to fetch logs from. Empty means local machine."
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Log file path or service name to inspect."
+                },
+                "lines": {
+                    "type": "number",
+                    "description": "Number of log lines to fetch."
+                },
+                "grep": {
+                    "type": "string",
+                    "description": "Keyword filter for log lines."
+                }
+            },
+            "optional_parameters": [
+                "server",
+                "path",
+                "lines",
+                "grep"
+            ],
+            "utterance_samples": [
+                "show application logs",
+                "fetch nginx error logs on prod-web",
+                "get last 200 lines of /var/log/app/error.log",
+                "show logs for the api service on staging",
+                "fetch logs on production filtered by ERROR",
+                "tail the app logs on the web server",
+                "show recent errors in the application logs",
+                "get last 50 lines from /var/log/syslog on db-server"
+            ]
+        },
+        "docker_logs": {
+            "type": "logic",
+            "description": "Get Docker container logs, status, count, and health. Use for Docker operations on THIS machine, an SSH-connected server, or a named remote Docker endpoint registered in Oz (like 'linode', 'vps', 'prod-docker'). Automatically detects whether the named server is a Docker API endpoint and routes accordingly. For general server health (CPU/memory/disk) use server_health.",
+            "parameters": {
+                "server": {
+                    "type": "string",
+                    "description": "Target server name for Docker operations. Empty means local machine."
+                },
+                "container": {
+                    "type": "string",
+                    "description": "Container name to inspect."
+                },
+                "lines": {
+                    "type": "number",
+                    "description": "Number of log lines to fetch."
+                },
+                "grep": {
+                    "type": "string",
+                    "description": "Keyword filter for log lines."
+                }
+            },
+            "optional_parameters": [
+                "server",
+                "container",
+                "lines",
+                "grep"
+            ],
+            "utterance_samples": [
+                "show me docker logs for nginx",
+                "check the api container logs on prod-web",
+                "get last 100 lines of logs for the postgres container",
+                "why is the redis container crashing",
+                "show docker container status on staging",
+                "check all docker containers on the server",
+                "get logs from the web container with filter ERROR",
+                "is the nginx container running on production",
+                "how many docker containers are running on server AIT5252",
+                "how many containers are running on prod-web",
+                "list docker containers on staging",
+                "check docker containers on AIT5252",
+                "show running containers on the server",
+                "count docker containers on production",
+                "how many docker containers are running on linode",
+                "check containers on linode",
+                "list containers on the vps",
+                "how many containers are running on my docker endpoint"
+            ]
+        },
+        "proxmox": {
+            "type": "logic",
+            "description": "Manage and query a Proxmox VE hypervisor cluster. Use for: listing VMs and containers, checking VM/node status, starting/stopping/rebooting VMs or LXC containers, checking storage, viewing cluster health, node resource usage. Works on any registered Proxmox endpoint.",
+            "parameters": {
+                "server": {
+                    "type": "string",
+                    "description": "Proxmox endpoint name if the user specifies one. Empty to use the default registered endpoint."
+                }
+            },
+            "optional_parameters": [
+                "server"
+            ],
+            "utterance_samples": [
+                "list all VMs on proxmox",
+                "show proxmox cluster status",
+                "how many VMs are running on proxmox",
+                "check proxmox node status",
+                "start VM 100 on proxmox",
+                "stop VM ubuntu-server",
+                "reboot the proxmox VM named web-server",
+                "show storage on proxmox",
+                "what is the proxmox node CPU usage",
+                "list LXC containers on proxmox",
+                "show VM 101 status",
+                "check proxmox health",
+                "list all virtual machines",
+                "show proxmox memory usage",
+                "proxmox node overview"
+            ]
+        },
+        "deploy": {
+            "type": "logic",
+            "description": "Use ONLY for git-based project deployment: git pull, install dependencies, build, and restart a service. NOT for deploying containers or Docker images \u2014 use n8n_agent for that.",
+            "parameters": {
+                "server": {
+                    "type": "string",
+                    "description": "Target server name to deploy to. Empty means local machine."
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Project directory path on the server."
+                },
+                "branch": {
+                    "type": "string",
+                    "description": "Git branch to deploy."
+                },
+                "service": {
+                    "type": "string",
+                    "description": "Service name to restart after deploy."
+                }
+            },
+            "optional_parameters": [
+                "server",
+                "path",
+                "branch",
+                "service"
+            ],
+            "utterance_samples": [
+                "deploy the project at /var/www/app on prod-web",
+                "deploy to production from the main branch",
+                "pull and restart the api service on staging",
+                "deploy /home/ubuntu/myapp to the web server",
+                "update and restart the nginx service on prod",
+                "deploy the app from branch develop on staging-server",
+                "run deployment for /opt/services/backend"
+            ]
+        },
+        "n8n_agent": {
+            "type": "logic",
+            "description": "Use for operational infrastructure tasks: deployments, configuration, installation, setup, backups, restores, migrations, monitoring, and any other concrete action on servers or containers. Routes the user's request to an external workflow that can execute it. First ask with confirmed=false, then call with confirmed=true if user agrees. For investigative/analytical tasks (diagnose, troubleshoot, debug) use launch_agent instead.",
+            "parameters": {
+                "agent_name": {
+                    "type": "string",
+                    "description": "The n8n agent name that best matches the user's request (e.g. devops, k8s, backup). Leave empty if unsure."
+                },
+                "task": {
+                    "type": "string",
+                    "description": "The task or question to send to the n8n agent."
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "Set to false to ask the user first. Set to true only if the user already agreed to use n8n."
+                }
+            },
+            "optional_parameters": [
+                "agent_name",
+                "task",
+                "confirmed"
+            ],
+            "utterance_samples": [
+                "deploy nginx docker container with custom port 8989",
+                "deploy nginx on port 8989 and give me the container ID",
+                "deploy nginx docker container",
+                "set up a new web server",
+                "install nginx on the production server",
+                "configure monitoring for the api service",
+                "back up the database to S3",
+                "migrate the application to the new server",
+                "restore the backup from yesterday",
+                "ask the devops n8n agent to deploy nginx"
+            ]
+        },
+        "launch_agent": {
+            "type": "logic",
+            "description": "Use for investigative/analytical infrastructure tasks: diagnose why something is failing, troubleshoot errors, debug issues, analyze logs or metrics, find root causes, investigate anomalies. For concrete operational tasks (deploy, configure, install, setup, backup, monitor) use n8n_agent instead.",
+            "parameters": {
+                "prompt": {
+                    "type": "string",
+                    "description": "The full user request or task description to give to the agent."
+                }
+            },
+            "optional_parameters": [
+                "prompt"
+            ],
+            "utterance_samples": [
+                "investigate why the API is returning 500 errors on prod",
+                "analyse the logs and find what is causing slowdowns",
+                "troubleshoot the failing deployment on staging",
+                "debug why the service keeps restarting on prod-web",
+                "diagnose the database connection issue on the server",
+                "check why the network is slow on the database server",
+                "find out why the backup is failing",
+                "investigate the high memory usage on the web server",
+                "analyse the error logs and tell me what is wrong",
+                "why is the nginx container crashing on production",
+                "I need help with something on the server",
+                "can you handle a server task for me",
+                "help me with an infrastructure issue"
+            ]
+        },
+        "check_website": {
+            "type": "logic",
+            "description": "Check if a website is up/down from server-side. Reports HTTP status code, response time, and any errors. Can optionally check from a specific server (external perspective).",
+            "parameters": {
+                "url": {
+                    "type": "string",
+                    "description": "The website URL to check (e.g. https://example.com)."
+                },
+                "domain": {
+                    "type": "string",
+                    "description": "Alternative to url: the domain name to check (e.g. example.com)."
+                },
+                "server": {
+                    "type": "string",
+                    "description": "Optional server to check FROM (external perspective). Empty means check from this machine."
+                }
+            },
+            "optional_parameters": [
+                "url",
+                "domain",
+                "server"
+            ],
+            "utterance_samples": [
+                "check if https://example.com is up",
+                "is my website https://mysite.com down",
+                "monitor https://api.myapp.com/health",
+                "check website status for https://shop.example.com",
+                "is https://blog.example.com reachable",
+                "check https://staging.example.com from the production server",
+                "verify https://app.example.com responds with 200",
+                "can you check if server with IP 192.168.1.1 is online",
+                "is server 10.0.0.50 reachable",
+                "check if host 172.105.253.206 is up",
+                "test connectivity to server 172.16.0.1",
+                "is host 10.0.0.10 responding",
+                "verify 192.168.0.1 is online",
+                "check if remote server 10.0.0.1 is reachable",
+                "ping server 192.168.1.100 to see if it responds",
+                "is the server at 10.0.0.5 alive"
+            ]
+        },
+        "list_agents": {
+            "type": "logic",
+            "description": "List recent agent runs and their current status (completed, running, failed).",
+            "utterance_samples": [
+                "list recent agent runs",
+                "show me the last agent tasks",
+                "what agents have been running",
+                "show agent history"
+            ]
+        },
+        "get_agent": {
+            "type": "logic",
+            "description": "Get details, status and full output logs of a specific agent run by its ID.",
+            "utterance_samples": [
+                "get status of agent 42",
+                "show output for agent run 7",
+                "what did agent 15 do",
+                "check on agent number 3"
+            ]
+        },
+        "cancel_agent": {
+            "type": "logic",
+            "description": "Cancel a currently running agent by its ID.",
+            "utterance_samples": [
+                "cancel agent 5",
+                "stop agent run 12",
+                "kill agent number 8"
+            ]
+        },
+        "list_servers": {
+            "type": "logic",
+            "description": "List all registered servers in Oz, showing their names, hosts, and authentication type.",
+            "utterance_samples": [
+                "list my servers",
+                "show registered servers",
+                "what servers do I have",
+                "show me all available servers",
+                "which servers are configured in Oz"
+            ]
+        }
     }
-  }
 }

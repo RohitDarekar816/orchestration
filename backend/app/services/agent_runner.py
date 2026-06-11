@@ -727,11 +727,131 @@ class CloudflareServerHealthAgentRunner:
         await self._update_status(AgentStatus.CANCELLED)
 
 
+class CloudflareProxmoxAgentRunner:
+    """Delegates Proxmox VE operations to a deployed Cloudflare Worker using Workers AI + Proxmox REST API."""
+
+    def __init__(self, agent_run: AgentRun, db: AsyncSession):
+        self.agent_run = agent_run
+        self.db = db
+
+    async def run(self):
+        await self._update_status(AgentStatus.RUNNING)
+
+        if not settings.cf_proxmox_agent_url:
+            await self._log("error", "CF_PROXMOX_AGENT_URL is not configured. Deploy the Cloudflare Proxmox Agent first.")
+            await self._update_status(AgentStatus.FAILED)
+            return
+
+        from sqlalchemy import select as sa_select
+        from app.models.proxmox_endpoint import ProxmoxEndpoint
+        from app.services.secret_service import SecretService
+
+        result = await self.db.execute(
+            sa_select(ProxmoxEndpoint)
+            .where(ProxmoxEndpoint.user_id == self.agent_run.user_id)
+            .order_by(ProxmoxEndpoint.created_at.asc())
+            .limit(1)
+        )
+        endpoint = result.scalar_one_or_none()
+
+        if not endpoint:
+            await self._log(
+                "error",
+                "No Proxmox endpoint registered. Go to Settings → Proxmox Endpoints in the Oz UI and add one."
+            )
+            await self._update_status(AgentStatus.FAILED)
+            return
+
+        proxmox_token = ""
+        if endpoint.token_secret_id:
+            try:
+                svc = SecretService(self.db)
+                proxmox_token = await svc.get_secret_value(endpoint.token_secret_id)
+            except Exception as e:
+                await self._log("error", f"Failed to decrypt Proxmox API token: {e}")
+                await self._update_status(AgentStatus.FAILED)
+                return
+
+        payload = {
+            "task": self.agent_run.prompt or "",
+            "proxmox_url": endpoint.api_url,
+            "proxmox_token": proxmox_token,
+            "endpoint_name": endpoint.name,
+            "default_node": endpoint.default_node,
+        }
+
+        worker_url = settings.cf_proxmox_agent_url.rstrip("/") + "/"
+        timeout = min(self.agent_run.max_runtime or 120, 300)
+
+        try:
+            await self._log("stdout", f"[cf-proxmox-agent] Calling Cloudflare Worker → {worker_url}")
+            await self._log("stdout", f"[cf-proxmox-agent] Proxmox endpoint: {endpoint.name} ({endpoint.api_url})")
+
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(worker_url, json=payload)
+
+            if response.status_code != 200:
+                await self._log("error", f"CF Worker returned HTTP {response.status_code}: {response.text[:500]}")
+                await self._update_status(AgentStatus.FAILED)
+                return
+
+            data = response.json()
+            output: str = data.get("output", "(no output)")
+            success: bool = data.get("success", False)
+            tool_calls: int = data.get("tool_calls", 0)
+
+            await self._log("stdout", output)
+            if tool_calls:
+                await self._log("stdout", f"[cf-proxmox-agent] Completed ({tool_calls} tool calls)")
+
+            self.agent_run.exit_code = 0 if success else 1
+            self.agent_run.status = AgentStatus.COMPLETED if success else AgentStatus.FAILED
+            self.agent_run.finished_at = datetime.now(timezone.utc)
+            await self.db.commit()
+
+        except httpx.TimeoutException:
+            await self._log("error", f"CF Worker timed out after {timeout}s")
+            await self._update_status(AgentStatus.FAILED)
+        except Exception as e:
+            await self._log("error", f"{type(e).__name__}: {e}")
+            for line in traceback.format_exc().splitlines():
+                await self._log("error", line)
+            await self._update_status(AgentStatus.FAILED)
+
+    async def _update_status(self, status: AgentStatus):
+        self.agent_run.status = status
+        if status == AgentStatus.RUNNING:
+            self.agent_run.started_at = datetime.now(timezone.utc)
+        elif status in (AgentStatus.COMPLETED, AgentStatus.FAILED, AgentStatus.CANCELLED):
+            self.agent_run.finished_at = datetime.now(timezone.utc)
+        await self.db.commit()
+
+    async def _log(self, stream: str, content: str):
+        log = AgentLog(agent_run_id=self.agent_run.id, stream=stream, content=content)
+        self.db.add(log)
+        await self.db.commit()
+        await self._broadcast(stream, content)
+
+    async def _broadcast(self, stream: str, content: str):
+        ws = active_sessions.get(self.agent_run.id)
+        if ws:
+            try:
+                ts = datetime.now(timezone.utc).isoformat()
+                await ws.send_json({"stream": stream, "content": content, "timestamp": ts})
+            except Exception:
+                active_sessions.pop(self.agent_run.id, None)
+
+    async def cancel(self):
+        await self._update_status(AgentStatus.CANCELLED)
+
+
 def get_runner(agent_run: AgentRun, db: AsyncSession):
     if agent_run.agent_type == "cloudflare_docker_agent":
         return CloudflareDockerAgentRunner(agent_run, db)
     if agent_run.agent_type == "cloudflare_server_health_agent":
         return CloudflareServerHealthAgentRunner(agent_run, db)
+    if agent_run.agent_type == "cloudflare_proxmox_agent":
+        return CloudflareProxmoxAgentRunner(agent_run, db)
     if settings.oz_runner == "docker":
         return DockerAgentRunner(agent_run, db)
     return LocalAgentRunner(agent_run, db)

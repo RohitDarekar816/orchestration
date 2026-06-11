@@ -75,6 +75,7 @@ const NOISE_PATTERNS: RegExp[] = [
   // CF agent status lines (debug/trace, not the AI answer)
   /^\[cf-docker-agent\]/,
   /^\[cf-server-health-agent\]/,
+  /^\[cf-proxmox-agent\]/,
 
   // System-prompt content leaking through ps aux / process listings
   /--dangerously-skip-permissions/,

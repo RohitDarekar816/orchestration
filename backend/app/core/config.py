@@ -36,6 +36,7 @@ class Settings(BaseSettings):
         # Cloudflare edge agents
         "cloudflare_docker_agent",
         "cloudflare_server_health_agent",
+        "cloudflare_proxmox_agent",
     ]
     oz_commandcode_api_key: str = ""
     # URL of a persistent `opencode serve` instance to attach to instead of cold-starting.
@@ -48,6 +49,9 @@ class Settings(BaseSettings):
 
     # Cloudflare Server Health Agent — deployed Worker URL.
     cf_server_health_agent_url: str = ""
+
+    # Cloudflare Proxmox Agent — deployed Worker URL.
+    cf_proxmox_agent_url: str = ""
 
 
 @lru_cache

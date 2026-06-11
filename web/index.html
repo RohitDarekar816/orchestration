@@ -49,6 +49,7 @@
           <a href="#" onclick="showPage('schedules')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="schedules">Schedules</a>
           <a href="#" onclick="showPage('servers')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="servers">Servers</a>
           <a href="#" onclick="showPage('docker-endpoints')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="docker-endpoints">Docker Endpoints</a>
+          <a href="#" onclick="showPage('proxmox-endpoints')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="proxmox-endpoints">Proxmox Endpoints</a>
           <a href="#" onclick="showPage('secrets')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="secrets">Secrets</a>
           <a href="#" onclick="showPage('chat')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="chat">Chat</a>
         </nav>
@@ -271,6 +272,7 @@ function showPage(page) {
     schedules: renderSchedules,
     servers: renderServers,
     'docker-endpoints': renderDockerEndpoints,
+    'proxmox-endpoints': renderProxmoxEndpoints,
     secrets: renderSecrets,
     chat: renderChat,
   };
@@ -1255,6 +1257,247 @@ function closeDepTestOverlay() {
   document.getElementById('dep-test-overlay').classList.add('hidden');
 }
 
+// --- Proxmox Endpoints ---
+
+async function renderProxmoxEndpoints() {
+  const el = document.getElementById('page-content');
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to manage Proxmox endpoints.</p>'; return; }
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading...</div>';
+  try {
+    const endpoints = await api('GET', '/proxmox-endpoints');
+    el.innerHTML = `
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Proxmox Endpoints</h1>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Register Proxmox VE clusters for the Cloudflare Proxmox Agent to manage VMs, containers, and nodes.</p>
+        </div>
+        <button onclick="showCreateProxmoxEndpoint()" class="px-3 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600">+ Add Endpoint</button>
+      </div>
+
+      <div class="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 mb-6 text-sm">
+        <div class="font-medium text-orange-800 dark:text-orange-300 mb-2">⚙️ Setup: Expose Proxmox API via nginx</div>
+        <div class="text-orange-700 dark:text-orange-400 space-y-1">
+          <div>Proxmox runs on port <strong>8006</strong> which Cloudflare Workers cannot reach directly. Set up an nginx proxy:</div>
+          <div class="mt-2 bg-orange-100 dark:bg-orange-900/40 rounded p-2 font-mono text-xs leading-relaxed">
+            server {<br>
+            &nbsp;&nbsp;listen 443 ssl;<br>
+            &nbsp;&nbsp;server_name proxmox.yourdomain.com;<br>
+            &nbsp;&nbsp;location / {<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;proxy_pass https://127.0.0.1:8006;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;proxy_ssl_verify off;<br>
+            &nbsp;&nbsp;}<br>
+            }
+          </div>
+          <div class="mt-2">Then set <strong>API URL</strong> to <code class="bg-orange-100 dark:bg-orange-800/50 px-1 rounded">https://proxmox.yourdomain.com/api2/json</code></div>
+          <div>Create an API token in Proxmox UI → <strong>Datacenter → Permissions → API Tokens</strong>. Token format: <code class="bg-orange-100 dark:bg-orange-800/50 px-1 rounded">root@pam!tokenid=xxxxxxxx</code></div>
+        </div>
+      </div>
+
+      <div id="proxmox-endpoint-form"></div>
+
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 dark:bg-gray-800/50 text-left">
+            <tr>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Name</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">API URL</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Default Node</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Description</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Added</th>
+              <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${endpoints.length === 0
+              ? '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No Proxmox endpoints registered yet. Click <strong>+ Add Endpoint</strong> to add one.</td></tr>'
+              : endpoints.map(ep => `
+                <tr class="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                    <div class="flex items-center gap-2">
+                      <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 text-base">🖥️</span>
+                      ${escapeHtml(ep.name)}
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300 text-xs">${escapeHtml(ep.api_url)}</td>
+                  <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-mono">${escapeHtml(ep.default_node)}</span></td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">${ep.description ? escapeHtml(ep.description) : '<span class="italic">—</span>'}</td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">${new Date(ep.created_at).toLocaleString()}</td>
+                  <td class="px-4 py-3 flex items-center gap-3">
+                    <button onclick="testProxmoxEndpoint(${ep.id})" class="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 text-sm">Test</button>
+                    <button onclick="showEditProxmoxEndpoint(${ep.id})" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm">Edit</button>
+                    <button onclick="deleteProxmoxEndpoint(${ep.id})" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm">Delete</button>
+                  </td>
+                </tr>
+              `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="text-red-500 dark:text-red-400">Error: ${e.message}</div>`;
+  }
+}
+
+function showCreateProxmoxEndpoint() {
+  renderProxmoxEndpointForm(null);
+}
+
+async function showEditProxmoxEndpoint(id) {
+  try {
+    const ep = await api('GET', `/proxmox-endpoints/${id}`);
+    renderProxmoxEndpointForm(ep);
+  } catch (e) {
+    alert('Error loading endpoint: ' + e.message);
+  }
+}
+
+function renderProxmoxEndpointForm(ep) {
+  const isEdit = !!ep;
+  const el = document.getElementById('proxmox-endpoint-form');
+  el.innerHTML = `
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-5">
+      <h3 class="font-semibold text-gray-900 dark:text-gray-100 mb-4">${isEdit ? 'Edit Proxmox Endpoint' : 'Add Proxmox Endpoint'}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name <span class="text-red-500">*</span></label>
+          <input id="pve-name" type="text" placeholder="e.g. homelab, prod-pve" value="${isEdit ? escapeHtml(ep.name) : ''}"
+            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API URL <span class="text-red-500">*</span></label>
+          <input id="pve-url" type="url" placeholder="https://proxmox.yourdomain.com/api2/json" value="${isEdit ? escapeHtml(ep.api_url) : ''}"
+            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm font-mono">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Node <span class="text-red-500">*</span></label>
+          <input id="pve-node" type="text" placeholder="pve" value="${isEdit ? escapeHtml(ep.default_node) : 'pve'}"
+            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm font-mono">
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">The Proxmox node hostname shown in your datacenter. Usually "pve".</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Token ${isEdit ? '' : '<span class="text-red-500">*</span>'}</label>
+          <input id="pve-token" type="password" placeholder="${isEdit ? 'Leave blank to keep current token' : 'root@pam!tokenid=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'}" value=""
+            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm font-mono">
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Stored encrypted. Format: <span class="font-mono">USER@REALM!TOKENID=UUID</span></p>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+        <input id="pve-desc" type="text" placeholder="Optional — e.g. Home lab Proxmox cluster" value="${isEdit ? escapeHtml(ep.description || '') : ''}"
+          class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div id="pve-form-error" class="hidden mb-3 p-2 rounded bg-red-50 dark:bg-red-900/30 text-sm text-red-600 dark:text-red-400"></div>
+      <div class="flex gap-2">
+        <button onclick="${isEdit ? `doEditProxmoxEndpoint(${ep.id})` : 'doCreateProxmoxEndpoint()'}"
+          class="px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600">
+          ${isEdit ? 'Update Endpoint' : 'Save Endpoint'}
+        </button>
+        <button onclick="cancelProxmoxEndpointForm()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
+  document.getElementById('pve-name').focus();
+}
+
+function cancelProxmoxEndpointForm() {
+  document.getElementById('proxmox-endpoint-form').innerHTML = '';
+}
+
+function gatherProxmoxEndpointData(isEdit) {
+  const name = document.getElementById('pve-name').value.trim();
+  const api_url = document.getElementById('pve-url').value.trim();
+  const default_node = document.getElementById('pve-node').value.trim() || 'pve';
+  const api_token = document.getElementById('pve-token').value.trim();
+  const description = document.getElementById('pve-desc').value.trim() || null;
+  const errEl = document.getElementById('pve-form-error');
+
+  if (!name || !api_url) {
+    errEl.textContent = 'Name and API URL are required.';
+    errEl.classList.remove('hidden');
+    return null;
+  }
+  if (!isEdit && !api_token) {
+    errEl.textContent = 'API Token is required.';
+    errEl.classList.remove('hidden');
+    return null;
+  }
+  errEl.classList.add('hidden');
+  const data = { name, api_url, default_node, description };
+  if (api_token) data.api_token = api_token;
+  return data;
+}
+
+async function doCreateProxmoxEndpoint() {
+  const data = gatherProxmoxEndpointData(false);
+  if (!data) return;
+  try {
+    await api('POST', '/proxmox-endpoints', data);
+    cancelProxmoxEndpointForm();
+    renderProxmoxEndpoints();
+  } catch (e) {
+    const errEl = document.getElementById('pve-form-error');
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function doEditProxmoxEndpoint(id) {
+  const data = gatherProxmoxEndpointData(true);
+  if (!data) return;
+  try {
+    await api('PATCH', `/proxmox-endpoints/${id}`, data);
+    cancelProxmoxEndpointForm();
+    renderProxmoxEndpoints();
+  } catch (e) {
+    const errEl = document.getElementById('pve-form-error');
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function deleteProxmoxEndpoint(id) {
+  if (!confirm('Delete this Proxmox endpoint? The agent will no longer be able to manage this cluster.')) return;
+  try {
+    await api('DELETE', `/proxmox-endpoints/${id}`);
+    renderProxmoxEndpoints();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function testProxmoxEndpoint(id) {
+  const overlay = document.getElementById('pve-test-overlay');
+  const result = document.getElementById('pve-test-result');
+  const title = document.getElementById('pve-test-title');
+
+  // Fetch the endpoint to get url, then ask for token inline
+  let ep;
+  try { ep = await api('GET', `/proxmox-endpoints/${id}`); } catch (e) { alert('Error: ' + e.message); return; }
+
+  const token = prompt(`Enter the API token for "${ep.name}" to test the connection:\n(format: root@pam!tokenid=UUID)`);
+  if (!token) return;
+
+  title.textContent = ep.api_url;
+  result.textContent = 'Testing connection…';
+  result.className = 'p-3 rounded-lg text-sm font-mono bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200';
+  overlay.classList.remove('hidden');
+
+  try {
+    const info = await api('POST', '/proxmox-endpoints/test', { api_url: ep.api_url, api_token: token });
+    result.className = 'p-3 rounded-lg text-sm font-mono bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300';
+    result.textContent = `✓ Connected\nProxmox VE version: ${info.version}\nRelease: ${info.release}`;
+  } catch (e) {
+    result.className = 'p-3 rounded-lg text-sm font-mono bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300';
+    result.textContent = `✗ ${e.message}\n\nCheck:\n• nginx proxy is running on 443 → 8006\n• API token has correct permissions\n• URL ends with /api2/json`;
+  }
+}
+
+function closePveTestOverlay() {
+  document.getElementById('pve-test-overlay').classList.add('hidden');
+}
+
 // --- Chat ---
 
 async function renderChat() {
@@ -1288,6 +1531,23 @@ function escapeHtml(str) {
 // --- Start ---
 render();
 </script>
+
+<!-- Proxmox Test Overlay -->
+<div id="pve-test-overlay" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="closePveTestOverlay()">
+  <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl dark:shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div>
+        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Connection Test</h3>
+        <p id="pve-test-title" class="text-xs font-mono text-gray-500 dark:text-gray-400 mt-0.5 truncate"></p>
+      </div>
+      <button onclick="closePveTestOverlay()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none">&times;</button>
+    </div>
+    <div class="p-6">
+      <pre id="pve-test-result" class="p-3 rounded-lg text-sm font-mono bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 whitespace-pre-wrap"></pre>
+      <button onclick="closePveTestOverlay()" class="mt-4 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- File Viewer Modal -->
 <div id="file-viewer-overlay" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" onclick="closeFileViewer()">

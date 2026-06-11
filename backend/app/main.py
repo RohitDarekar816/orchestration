@@ -8,7 +8,8 @@ from app.core.database import init_db
 from app.models import server as _server_model  # noqa: F401 — ensures table is created
 from app.models import agent_command_audit as _agent_command_audit  # noqa: F401
 from app.models import docker_endpoint as _docker_endpoint_model  # noqa: F401 — ensures table is created
-from app.routes import agents, auth, chat, dashboard, docker_endpoints, n8n_agents, schedules, secrets, servers, skills
+from app.models import proxmox_endpoint as _proxmox_endpoint_model  # noqa: F401 — ensures table is created
+from app.routes import agents, auth, chat, dashboard, docker_endpoints, n8n_agents, proxmox_endpoints, schedules, secrets, servers, skills
 
 settings = get_settings()
 
@@ -43,6 +44,7 @@ app.include_router(chat.router)
 app.include_router(dashboard.router)
 app.include_router(n8n_agents.router)
 app.include_router(docker_endpoints.router)
+app.include_router(proxmox_endpoints.router)
 
 
 @app.get("/api/health")
