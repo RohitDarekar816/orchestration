@@ -8,31 +8,66 @@ import {
   getOzConfig,
   getToken,
   launchAndWait,
-  resolveServerByName,
+  resolveDockerTarget,
 } from '../lib/oz_client'
+
+import { formatDockerOutput } from './docker_logs'
 
 export const run: ActionFunction = async function (params) {
   const settings = new Settings()
   const network = new Network()
 
-  const serverName = (params.action_arguments?.server as string) || params.utterance || ''
-  const agentType = ((await settings.get('default_agent_type')) as string) || 'oz-local'
+  const nluServerHint = (params.action_arguments?.server as string) || ''
 
   try {
     const cfg = await getOzConfig(settings)
     const token = await getToken(cfg, network)
+    const utterance = params.utterance || ''
 
-    const server = serverName ? await resolveServerByName(serverName, cfg.apiUrl, token, network) : null
+    const target = await resolveDockerTarget(utterance, nluServerHint, cfg.apiUrl, token, network)
+
+    // ── Docker API endpoint → Cloudflare Server Health Agent ─────────────────
+    if (target.kind === 'endpoint') {
+      const ep = target.endpoint
+      await leon.answer({
+        key: 'checking_health',
+        data: { server: ep.name },
+      })
+
+      const { output, status, agentId } = await launchAndWait({
+        apiUrl: cfg.apiUrl,
+        token,
+        network,
+        agentType: 'cloudflare_server_health_agent',
+        prompt: utterance || `Check full system health on ${ep.name}`,
+        maxRuntime: 120,
+        maxPollSeconds: 180,
+      })
+
+      await leon.answer({
+        key: 'health_result',
+        data: {
+          server: ep.name,
+          logs: formatDockerOutput(output, ep.name),
+          agent_id: String(agentId),
+          status,
+        },
+      })
+      return
+    }
+
+    // ── SSH server or local machine → oz-local agent ──────────────────────────
+    const server = target.kind === 'ssh_server' ? target.server : null
     const serverLabel = server ? `${server.name} (${server.host})` : 'this machine'
 
     await leon.answer({ key: 'checking_health', data: { server: serverLabel } })
 
-    const target = server
+    const location = server
       ? `You have SSH access to ${server.name} (${server.host}). Run all commands on that server via SSH.
 Connection: OZ_SSH_* env vars, key at /tmp/oz_ssh_key (already written by entrypoint).`
       : `Run all commands on the local machine.`
 
-    const prompt = `You are a Linux systems administrator. ${target}
+    const prompt = `You are a Linux systems administrator. ${location}
 
 Check and report the system health in this order:
 1. CPU and load: run \`top -bn1 | head -8\` and \`uptime\`
@@ -47,7 +82,7 @@ Print each section with a clear header. Flag any obvious problems (disk > 80%, f
       apiUrl: cfg.apiUrl,
       token,
       network,
-      agentType,
+      agentType: 'oz-local',
       prompt,
       serverId: server?.id ?? null,
       maxRuntime: 300,
@@ -56,7 +91,12 @@ Print each section with a clear header. Flag any obvious problems (disk > 80%, f
 
     await leon.answer({
       key: 'health_result',
-      data: { server: serverLabel, logs: output, agent_id: String(agentId), status },
+      data: {
+        server: serverLabel,
+        logs: formatDockerOutput(output, serverLabel),
+        agent_id: String(agentId),
+        status,
+      },
     })
   } catch (error) {
     await leon.answer({ key: 'error', data: { message: errorMessage(error) } })

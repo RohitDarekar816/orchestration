@@ -13,7 +13,7 @@ import {
 
 // ── HTML formatter ────────────────────────────────────────────────────────────
 
-function formatDockerOutput(raw: string, serverLabel: string): string {
+export function formatDockerOutput(raw: string, serverLabel: string): string {
   const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
   if (!lines.length) return '<p style="color:#888">No output.</p>'
 

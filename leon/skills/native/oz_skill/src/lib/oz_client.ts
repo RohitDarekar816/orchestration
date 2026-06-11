@@ -72,8 +72,9 @@ const NOISE_PATTERNS: RegExp[] = [
   /^Write /,         // "Write config.yml"
   /^\$ /,            // $ cmd  (opencode echoes each bash command it runs)
 
-  // CF Docker Agent status lines (debug/trace, not the AI answer)
+  // CF agent status lines (debug/trace, not the AI answer)
   /^\[cf-docker-agent\]/,
+  /^\[cf-server-health-agent\]/,
 
   // System-prompt content leaking through ps aux / process listings
   /--dangerously-skip-permissions/,

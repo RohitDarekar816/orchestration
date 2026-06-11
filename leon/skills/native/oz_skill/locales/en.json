@@ -33,16 +33,16 @@
     "server_health": {
       "answers": {
         "checking_health": [
-          { "text": "Checking the health of <strong>{{ server }}</strong>. This may take a moment...", "speech": "Checking server health. One moment." }
+          { "text": "<p style=\"color:#94a3b8;font-size:13px;margin:4px 0\">🖥️ Checking health of <strong>{{ server }}</strong>…</p>", "speech": "Checking server health. One moment." }
         ],
         "still_working": [
-          { "text": "⏳ {{ message }}", "speech": "Still working, please wait." }
+          { "text": "<p style=\"color:#94a3b8;font-size:13px;margin:4px 0\">⏳ {{ message }}</p>", "speech": "Still working, please wait." }
         ],
         "health_result": [
-          { "text": "<div>{{ logs }}</div>", "speech": "Here is the health report." }
+          { "text": "{{ logs }}", "speech": "Here is the health report." }
         ],
         "error": [
-          { "text": "Failed to check server health: {{ message }}", "speech": "Failed to check server health." }
+          { "text": "<div style=\"background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:10px 14px;color:#dc2626;font-size:13px\">❌ {{ message }}</div>", "speech": "Failed to check server health." }
         ]
       }
     },

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
         "docker_agent", "k8s_agent", "linux_agent", "code_review", "git_agent",
         # Cloudflare edge agents
         "cloudflare_docker_agent",
+        "cloudflare_server_health_agent",
     ]
     oz_commandcode_api_key: str = ""
     # URL of a persistent `opencode serve` instance to attach to instead of cold-starting.
@@ -44,6 +45,9 @@ class Settings(BaseSettings):
     # Cloudflare Docker Agent — deployed Worker URL.
     # Set to the wrangler-deployed URL, e.g. https://cf-docker-agent.<account>.workers.dev
     cf_docker_agent_url: str = ""
+
+    # Cloudflare Server Health Agent — deployed Worker URL.
+    cf_server_health_agent_url: str = ""
 
 
 @lru_cache
