@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # Cloudflare Proxmox Agent — deployed Worker URL.
     cf_proxmox_agent_url: str = ""
 
+    # Leon AI assistant HTTP API
+    leon_http_url: str = "http://leon:5366"
+    leon_http_api_key: str = "dev-key-123"
+
 
 @lru_cache
 def get_settings() -> Settings:

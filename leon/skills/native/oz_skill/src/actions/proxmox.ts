@@ -24,13 +24,14 @@ export const run: ActionFunction = async function (params) {
     const token = await getToken(cfg, network)
 
     // Fetch registered Proxmox endpoints
-    const endpoints = await network.request<Array<{ id: number; name: string; api_url: string; default_node: string }>>({
-      url: `${cfg.apiUrl}/api/proxmox-endpoints`,
+    const res = await network.request<Array<{ id: number; name: string; api_url: string; default_node: string }>>({
+      url: `${cfg.apiUrl}/proxmox-endpoints`,
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` },
     })
+    const endpoints = Array.isArray(res.data) ? res.data : []
 
-    if (!endpoints || endpoints.length === 0) {
+    if (endpoints.length === 0) {
       await leon.answer({
         key: 'error',
         data: { message: 'No Proxmox endpoints registered. Add one in Settings → Proxmox Endpoints.' },
@@ -55,8 +56,8 @@ export const run: ActionFunction = async function (params) {
       network,
       agentType: 'cloudflare_proxmox_agent',
       prompt: utterance || `Show overall status of Proxmox cluster on ${ep.name}`,
-      maxRuntime: 120,
-      maxPollSeconds: 180,
+      maxRuntime: 240,
+      maxPollSeconds: 300,
     })
 
     await leon.answer({

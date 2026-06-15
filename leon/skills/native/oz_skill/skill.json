@@ -15,12 +15,12 @@
         "For server CPU/memory/disk/load \u2192 call server_health",
         "For application or system log inspection \u2192 call app_logs",
         "For Docker containers on THIS machine or an SSH-connected server (not a named remote Docker endpoint) \u2192 call docker_logs",
-        "For Proxmox VE operations (VMs, LXC containers, nodes, storage, cluster) \u2192 call proxmox",
+        "For Proxmox VE operations (VMs, LXC containers, nodes, storage, cluster) AND creating new VMs \u2192 call proxmox. VM names (rohit-vm, web-server, db-01) are NOT server/endpoint names \u2014 do not pass them as the server argument",
         "For Docker operations on a remote Docker API endpoint registered in Oz (e.g. 'linode', 'vps', 'prod-docker') \u2192 call docker_logs \u2014 it auto-detects Docker endpoints and routes correctly",
         "For deploying a project (git pull, install, restart) \u2192 call deploy",
         "For listing registered servers \u2192 call list_servers",
         "For checking if a website is up/down \u2192 call check_website",
-        "When a server name is mentioned, pass it as the server argument",
+        "When a SERVER/HOST name is mentioned for SSH or Docker operations, pass it as the server argument. But for Proxmox: only pass server if the user names a Proxmox cluster/endpoint — never set server to a VM name",
         "For operational infrastructure tasks (deploy, configure, install, setup, backup, restore, migrate, monitor) \u2192 call n8n_agent",
         "For investigative/analytical tasks (diagnose, troubleshoot, investigate, debug, analyze, find root cause) \u2192 call launch_agent",
         "If unsure which action fits, evaluate: is the user asking to DO something (operational) or to FIGURE OUT something (investigative)? Operational \u2192 n8n_agent. Investigative \u2192 launch_agent.",
@@ -186,11 +186,11 @@
         },
         "proxmox": {
             "type": "logic",
-            "description": "Manage and query a Proxmox VE hypervisor cluster. Use for: listing VMs and containers, checking VM/node status, starting/stopping/rebooting VMs or LXC containers, checking storage, viewing cluster health, node resource usage. Works on any registered Proxmox endpoint.",
+            "description": "Manage and query a Proxmox VE hypervisor cluster. Use for: listing VMs and containers, checking VM/node status, starting/stopping/rebooting/suspending VMs or LXC containers, checking storage, viewing cluster health, node resource usage, AND creating new VMs from cloud-init templates (e.g. 'create a new Ubuntu VM named web-server'). Works on any registered Proxmox endpoint. IMPORTANT: VM names (like 'rohit-vm', 'web-server', 'ubuntu-01') are NOT Proxmox endpoint names — leave the server parameter empty unless the user explicitly names a Proxmox endpoint.",
             "parameters": {
                 "server": {
                     "type": "string",
-                    "description": "Proxmox endpoint name if the user specifies one. Empty to use the default registered endpoint."
+                    "description": "Proxmox endpoint/cluster name only if user explicitly names one (e.g. 'on my home-proxmox'). Do NOT set this to a VM name or hostname. Leave empty to use the default registered endpoint."
                 }
             },
             "optional_parameters": [
@@ -211,7 +211,21 @@
                 "check proxmox health",
                 "list all virtual machines",
                 "show proxmox memory usage",
-                "proxmox node overview"
+                "proxmox node overview",
+                "create a new Ubuntu VM named rohit-vm",
+                "create a new VM called web-server with Ubuntu",
+                "provision a new Ubuntu server named db-01",
+                "create Ubuntu VM named test-server with 40GB disk",
+                "spin up a new VM with Ubuntu 24.04 called api-server",
+                "create a new virtual machine named staging-01",
+                "make a new Ubuntu VM called dev-box",
+                "provision a VM named prod-web with static IP 192.168.1.50",
+                "take a snapshot of VM 100",
+                "rollback VM 101 to snapshot before-update",
+                "delete snapshot snap1 from VM 102",
+                "show network interfaces on pve node",
+                "list storage content on local-lvm",
+                "show container config for LXC 200"
             ]
         },
         "deploy": {

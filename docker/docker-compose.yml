@@ -42,6 +42,8 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - OZ_OPENCODE_SERVER_URL=
       - CF_DOCKER_AGENT_URL=${CF_DOCKER_AGENT_URL:-}
+      - CF_SERVER_HEALTH_AGENT_URL=${CF_SERVER_HEALTH_AGENT_URL:-}
+      - CF_PROXMOX_AGENT_URL=${CF_PROXMOX_AGENT_URL:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -69,6 +71,9 @@ services:
       - DATABASE_URL=postgresql+asyncpg://oz:oz@db:5432/oz
       - REDIS_URL=redis://:oz-dev@redis:6379/0
       - SECRET_KEY=change-me-in-production
+      - CF_DOCKER_AGENT_URL=${CF_DOCKER_AGENT_URL:-}
+      - CF_SERVER_HEALTH_AGENT_URL=${CF_SERVER_HEALTH_AGENT_URL:-}
+      - CF_PROXMOX_AGENT_URL=${CF_PROXMOX_AGENT_URL:-}
     depends_on:
       db:
         condition: service_healthy
@@ -123,7 +128,7 @@ services:
       LEON_PORT: "5366"
       LEON_HOST: http://0.0.0.0
       LEON_LANG: en-US
-      LEON_LLM: cloudflare/@cf/meta/llama-3.1-8b-instruct-fp8-fast
+      LEON_LLM: groq/llama-3.1-8b-instant
       LEON_GROQ_API_KEY: ${GROQ_API_KEY}
       LEON_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       LEON_COMMANDCODE_API_KEY: ${LEON_COMMANDCODE_API_KEY}

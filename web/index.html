@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
 <title>Oz — Agent Orchestration</title>
 <script>
   if (localStorage.getItem('oz_dark') === 'true' || (!localStorage.getItem('oz_dark') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -51,6 +53,7 @@
           <a href="#" onclick="showPage('docker-endpoints')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="docker-endpoints">Docker Endpoints</a>
           <a href="#" onclick="showPage('proxmox-endpoints')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="proxmox-endpoints">Proxmox Endpoints</a>
           <a href="#" onclick="showPage('secrets')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="secrets">Secrets</a>
+          <a href="#" onclick="showPage('leon-config')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="leon-config">Leon LLM</a>
           <a href="#" onclick="showPage('chat')" class="block px-3 py-2 rounded text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 sidebar-link" data-page="chat">Chat</a>
         </nav>
       </aside>
@@ -274,6 +277,7 @@ function showPage(page) {
     'docker-endpoints': renderDockerEndpoints,
     'proxmox-endpoints': renderProxmoxEndpoints,
     secrets: renderSecrets,
+    'leon-config': renderLeonConfig,
     chat: renderChat,
   };
   (pages[page] || renderDashboard)();
@@ -533,30 +537,64 @@ async function cancelAgent(id) {
 }
 
 // --- Launch ---
+const AGENT_TYPE_OPTIONS = `
+  <optgroup label="oz-local (SSH / Docker sandbox)">
+    <option value="opencode">OpenCode</option>
+    <option value="claude-code">Claude Code</option>
+    <option value="codex">Codex CLI</option>
+    <option value="gemini-cli">Gemini CLI</option>
+    <option value="github">GitHub Agent</option>
+    <option value="custom">Custom</option>
+  </optgroup>
+  <optgroup label="Cloudflare Edge Agents">
+    <option value="cloudflare_docker_agent">CF Docker Agent</option>
+    <option value="cloudflare_server_health_agent">CF Server Health Agent</option>
+    <option value="cloudflare_proxmox_agent">CF Proxmox Agent</option>
+  </optgroup>
+`;
+
 async function renderLaunch() {
   const el = document.getElementById('page-content');
   if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to launch agents.</p>'; return; }
   let skillOpts = '';
+  let dockerOpts = '<option value="">— select endpoint —</option>';
+  let proxmoxOpts = '<option value="">— select endpoint —</option>';
   try {
-    const skills = await api('GET', '/skills');
-    if (skills.length > 0) {
-      skillOpts = `<option value="">None</option>` + skills.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
-    }
+    const [skills, dockerEps, proxmoxEps] = await Promise.all([
+      api('GET', '/skills').catch(() => []),
+      api('GET', '/docker-endpoints').catch(() => []),
+      api('GET', '/proxmox-endpoints').catch(() => []),
+    ]);
+    if (skills.length > 0) skillOpts = `<option value="">None</option>` + skills.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+    if (dockerEps.length > 0) dockerOpts = '<option value="">— select endpoint —</option>' + dockerEps.map(e => `<option value="${e.id}">${escapeHtml(e.name)} (${escapeHtml(e.host)})</option>`).join('');
+    if (proxmoxEps.length > 0) proxmoxOpts = '<option value="">— select endpoint —</option>' + proxmoxEps.map(e => `<option value="${e.id}">${escapeHtml(e.name)} (${escapeHtml(e.api_url)})</option>`).join('');
   } catch {}
   el.innerHTML = `
     <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Launch Agent</h1>
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 max-w-2xl">
       <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Type</label>
-        <select id="launch-agent-type" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
-          <option value="opencode">OpenCode</option>
-          <option value="claude-code">Claude Code</option>
-          <option value="codex">Codex CLI</option>
-          <option value="gemini-cli">Gemini CLI</option>
-          <option value="github">GitHub Agent</option>
-          <option value="custom">Custom</option>
+        <select id="launch-agent-type" onchange="onLaunchAgentTypeChange()" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+          ${AGENT_TYPE_OPTIONS}
         </select>
       </div>
+
+      <!-- Dynamic endpoint selector for CF agents -->
+      <div id="launch-docker-endpoint" class="mb-4 hidden">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Docker Endpoint</label>
+        <select id="launch-docker-ep-id" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+          ${dockerOpts}
+        </select>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Select the Docker API endpoint this agent will connect to.</p>
+      </div>
+      <div id="launch-proxmox-endpoint" class="mb-4 hidden">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Proxmox Endpoint</label>
+        <select id="launch-proxmox-ep-id" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+          ${proxmoxOpts}
+        </select>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Select the Proxmox cluster this agent will manage.</p>
+      </div>
+
       <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skill (optional)</label>
         <select id="launch-skill" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
@@ -579,17 +617,32 @@ async function renderLaunch() {
   `;
 }
 
+function onLaunchAgentTypeChange() {
+  const type = document.getElementById('launch-agent-type').value;
+  const isDocker = type === 'cloudflare_docker_agent' || type === 'cloudflare_server_health_agent';
+  const isProxmox = type === 'cloudflare_proxmox_agent';
+  document.getElementById('launch-docker-endpoint').classList.toggle('hidden', !isDocker);
+  document.getElementById('launch-proxmox-endpoint').classList.toggle('hidden', !isProxmox);
+}
+
 async function doLaunch() {
   const el = document.getElementById('launch-result');
   el.innerHTML = 'Launching...';
   const skillSelect = document.getElementById('launch-skill');
   const skillId = skillSelect ? parseInt(skillSelect.value) : null;
   try {
+    const agentType = document.getElementById('launch-agent-type').value;
+    const isDocker = agentType === 'cloudflare_docker_agent' || agentType === 'cloudflare_server_health_agent';
+    const isProxmox = agentType === 'cloudflare_proxmox_agent';
+    const dockerEpId = isDocker ? parseInt(document.getElementById('launch-docker-ep-id').value) || undefined : undefined;
+    const proxmoxEpId = isProxmox ? parseInt(document.getElementById('launch-proxmox-ep-id').value) || undefined : undefined;
     const data = await api('POST', '/agents/launch', {
-      agent_type: document.getElementById('launch-agent-type').value,
+      agent_type: agentType,
       prompt: document.getElementById('launch-prompt').value,
       skill_id: skillId || undefined,
       max_runtime: parseInt(document.getElementById('launch-timeout').value) || 3600,
+      docker_endpoint_id: dockerEpId,
+      proxmox_endpoint_id: proxmoxEpId,
     });
     el.innerHTML = `<div class="text-green-600 dark:text-green-400">Agent launched! ID: <strong>${data.id}</strong> Status: ${data.status}</div>
       <button onclick="showAgentDetail(${data.id})" class="mt-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm">View Run</button>`;
@@ -640,9 +693,7 @@ function showCreateSkill() {
         <div><input id="skill-name" placeholder="Skill name" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm"></div>
         <div>
           <select id="skill-agent" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm">
-            <option value="opencode">OpenCode</option>
-            <option value="claude-code">Claude Code</option>
-            <option value="codex">Codex CLI</option>
+            ${AGENT_TYPE_OPTIONS}
           </select>
         </div>
       </div>
@@ -736,9 +787,7 @@ function showCreateSchedule() {
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
           <select id="sched-agent" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded px-3 py-2 text-sm">
-            <option value="opencode">OpenCode</option>
-            <option value="claude-code">Claude Code</option>
-            <option value="codex">Codex CLI</option>
+            ${AGENT_TYPE_OPTIONS}
           </select>
         </div>
       </div>
@@ -1579,6 +1628,217 @@ render();
     </div>
   </div>
 </div>
+
+
+<script>
+// ── Leon LLM Config ──────────────────────────────────────────────────────────
+
+const LEON_PROVIDERS = [
+  {
+    value: 'groq', label: 'Groq', envKey: 'LEON_GROQ_API_KEY',
+    models: [
+      { value: 'llama-3.1-8b-instant',     label: 'Llama 3.1 8B Instant (fast)' },
+      { value: 'llama-3.3-70b-versatile',  label: 'Llama 3.3 70B Versatile (smart)' },
+      { value: 'llama-3.1-70b-versatile',  label: 'Llama 3.1 70B Versatile' },
+      { value: 'moonshotai-kimi-k2-instruct', label: 'Kimi K2 Instruct' },
+    ]
+  },
+  {
+    value: 'cloudflare', label: 'Cloudflare Workers AI', envKey: 'LEON_CLOUDFLARE_API_TOKEN',
+    models: [
+      { value: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', label: 'Llama 3.1 8B FP8 Fast' },
+      { value: '@cf/meta/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout 17B' },
+      { value: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B FP8 Fast' },
+    ]
+  },
+  {
+    value: 'openrouter', label: 'OpenRouter', envKey: 'LEON_OPENROUTER_API_KEY',
+    models: [
+      { value: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1 8B (free)' },
+      { value: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash' },
+      { value: 'anthropic/claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+      { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+    ]
+  },
+  {
+    value: 'anthropic', label: 'Anthropic', envKey: 'LEON_ANTHROPIC_API_KEY',
+    models: [
+      { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+      { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+    ]
+  },
+  {
+    value: 'openai', label: 'OpenAI', envKey: 'LEON_OPENAI_API_KEY',
+    models: [
+      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+      { value: 'gpt-4o', label: 'GPT-4o' },
+    ]
+  },
+  {
+    value: 'commandcode', label: 'CommandCode', envKey: 'LEON_COMMANDCODE_API_KEY',
+    models: [
+      { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+      { value: 'gpt-4o', label: 'GPT-4o' },
+    ]
+  },
+];
+
+async function renderLeonConfig() {
+  const el = document.getElementById('page-content');
+  if (!currentUser) { el.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Sign in to configure Leon.</p>'; return; }
+  el.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading Leon status…</div>';
+
+  let current = { provider: '', model: '', enabled: false, target_value: '' };
+  try {
+    current = await api('GET', '/leon/config');
+  } catch (e) {
+    // Leon might be unreachable; show the form anyway with empty state
+  }
+
+  const currentProvider = current.provider || '';
+  const currentModel   = current.model   || '';
+
+  el.innerHTML = `
+    <div class="max-w-2xl">
+      <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Leon LLM Configuration</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Change Leon's active language model at runtime — no restart required.</p>
+      </div>
+
+      <!-- Current status card -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Current Model</div>
+        ${currentProvider
+          ? `<div class="flex items-center gap-3">
+               <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-lg">🤖</span>
+               <div>
+                 <div class="font-medium text-gray-900 dark:text-gray-100">${escapeHtml(currentModel || 'unknown')}</div>
+                 <div class="text-sm text-gray-500 dark:text-gray-400">Provider: <span class="font-mono">${escapeHtml(currentProvider)}</span></div>
+               </div>
+               <span class="ml-auto px-2 py-0.5 rounded-full text-xs font-medium ${current.enabled ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}">
+                 ${current.enabled ? 'Active' : 'Inactive'}
+               </span>
+             </div>`
+          : `<div class="text-sm text-yellow-600 dark:text-yellow-400">⚠️ Could not reach Leon. Check that Leon is running.</div>`
+        }
+      </div>
+
+      <!-- Change model form -->
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-4">Switch Model</div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Provider</label>
+            <select id="leon-provider-select" onchange="onLeonProviderChange()"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              ${LEON_PROVIDERS.map(p => `<option value="${p.value}" ${p.value === currentProvider ? 'selected' : ''}>${escapeHtml(p.label)}</option>`).join('')}
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model</label>
+            <select id="leon-model-preset" onchange="onLeonModelPresetChange()"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            </select>
+            <input id="leon-model-custom" type="text" placeholder="Or type a custom model name…"
+              class="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              value="${escapeHtml(currentModel)}">
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Selecting a preset fills the field; you can still edit it manually.</p>
+          </div>
+
+          <div id="leon-apikey-hint" class="hidden p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-300"></div>
+
+          <div id="leon-save-status" class="hidden text-sm"></div>
+
+          <button onclick="saveLeonConfig()"
+            class="w-full py-2.5 bg-indigo-600 dark:bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors">
+            Apply Model
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-800 dark:text-blue-300">
+        <div class="font-semibold mb-1">API Keys</div>
+        API keys are set via environment variables in <code class="bg-blue-100 dark:bg-blue-800/50 px-1 rounded">docker-compose.yml</code>.
+        Switching to a provider whose API key is not configured will fail.
+        Currently pre-configured: <strong>Groq</strong> (<code>LEON_GROQ_API_KEY</code>), <strong>Cloudflare</strong> (<code>LEON_CLOUDFLARE_API_TOKEN</code>), <strong>OpenRouter</strong> (<code>LEON_OPENROUTER_API_KEY</code>), <strong>CommandCode</strong> (<code>LEON_COMMANDCODE_API_KEY</code>).
+      </div>
+    </div>
+  `;
+
+  // Populate model presets for current provider
+  onLeonProviderChange();
+}
+
+function onLeonProviderChange() {
+  const providerVal = document.getElementById('leon-provider-select')?.value;
+  if (!providerVal) return;
+  const provider = LEON_PROVIDERS.find(p => p.value === providerVal);
+  const presetEl = document.getElementById('leon-model-preset');
+  const hintEl   = document.getElementById('leon-apikey-hint');
+
+  presetEl.innerHTML = provider
+    ? provider.models.map(m => `<option value="${m.value}">${escapeHtml(m.label)}</option>`).join('')
+    : '';
+
+  // Sync custom field to first preset
+  if (provider?.models.length) {
+    const custom = document.getElementById('leon-model-custom');
+    if (custom && !custom.value) custom.value = provider.models[0].value;
+    presetEl.value = provider.models[0].value;
+  }
+
+  // Show API key hint for providers that need one
+  const PRECONFIGURED = new Set(['groq', 'cloudflare', 'openrouter', 'commandcode']);
+  if (hintEl) {
+    if (!PRECONFIGURED.has(providerVal)) {
+      hintEl.classList.remove('hidden');
+      hintEl.textContent = `⚠️ "${providerVal}" may require an API key not yet configured in docker-compose.yml. Set the appropriate LEON_*_API_KEY variable and restart Leon before using this provider.`;
+    } else {
+      hintEl.classList.add('hidden');
+    }
+  }
+}
+
+function onLeonModelPresetChange() {
+  const preset = document.getElementById('leon-model-preset')?.value;
+  if (preset) {
+    const custom = document.getElementById('leon-model-custom');
+    if (custom) custom.value = preset;
+  }
+}
+
+async function saveLeonConfig() {
+  const provider = document.getElementById('leon-provider-select')?.value;
+  const model    = (document.getElementById('leon-model-custom')?.value || '').trim();
+  const statusEl = document.getElementById('leon-save-status');
+
+  if (!provider || !model) {
+    statusEl.className = 'text-sm text-red-600 dark:text-red-400';
+    statusEl.textContent = 'Please select a provider and enter a model name.';
+    statusEl.classList.remove('hidden');
+    return;
+  }
+
+  const target = `${provider}/${model}`;
+  statusEl.className = 'text-sm text-gray-500 dark:text-gray-400';
+  statusEl.textContent = `Applying ${target}…`;
+  statusEl.classList.remove('hidden');
+
+  try {
+    await api('PUT', '/leon/config', { target });
+    statusEl.className = 'text-sm text-green-600 dark:text-green-400';
+    statusEl.textContent = `✓ Leon is now using ${target}`;
+    // Refresh the status card
+    setTimeout(() => renderLeonConfig(), 1200);
+  } catch (e) {
+    statusEl.className = 'text-sm text-red-600 dark:text-red-400';
+    statusEl.textContent = `Error: ${e.message}`;
+  }
+}
+</script>
 
 </body>
 </html>
