@@ -22,10 +22,7 @@ type Message = UserMessage | SystemMessage | AssistantMessage | ToolMessage
 interface OaiToolCall {
   id: string
   type: 'function'
-  function: {
-    name: string
-    arguments: string
-  }
+  function: { name: string; arguments: string }
 }
 
 interface AiResponse {
@@ -34,6 +31,48 @@ interface AiResponse {
 }
 
 const MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct'
+
+/**
+ * Llama 4 Scout sometimes emits tool calls as inline JSON in the response
+ * field instead of the structured tool_calls array.
+ */
+function parseLlamaInlineToolCalls(response: string, validNames: Set<string>): OaiToolCall[] | null {
+  if (!response || !response.includes('"name"')) return null
+  const calls: OaiToolCall[] = []
+  let searchFrom = 0
+
+  while (searchFrom < response.length) {
+    const braceIdx = response.indexOf('{', searchFrom)
+    if (braceIdx === -1) break
+
+    let depth = 0, end = -1
+    for (let i = braceIdx; i < response.length; i++) {
+      if (response[i] === '{') depth++
+      else if (response[i] === '}') { depth--; if (depth === 0) { end = i; break } }
+    }
+    if (end === -1) break
+
+    const chunk = response.slice(braceIdx, end + 1)
+    searchFrom = end + 1
+
+    try {
+      const obj = JSON.parse(chunk) as { name?: string; parameters?: Record<string, unknown> }
+      if (!obj.name || !validNames.has(obj.name)) continue
+      const flat: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(obj.parameters ?? {})) {
+        flat[k] = (v && typeof v === 'object' && 'value' in (v as object))
+          ? (v as { value: unknown }).value : v
+      }
+      calls.push({
+        id: `llama_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: 'function',
+        function: { name: obj.name, arguments: JSON.stringify(flat) },
+      })
+    } catch { /* malformed chunk — skip */ }
+  }
+
+  return calls.length > 0 ? calls : null
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -90,18 +129,53 @@ Be concise. Use bullet points and short headers. Do not repeat raw JSON.`
     let toolCallCount = 0
     let finalText = ''
 
+    // Tie all LLM calls in this request to the same Workers AI instance for prompt cache hits
+    const sessionId = `ses_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
+
+    // Health check needs 6 tool steps (one per procedure step); 7 gives a wrap-up buffer
+    const MAX_TOOL_STEPS = 7
+
     try {
-      for (let step = 0; step < 12; step++) {
-        const result = await (env.AI.run as Function)(MODEL, { messages, tools }) as AiResponse
+      for (let step = 0; step <= MAX_TOOL_STEPS; step++) {
+        const isWrapUp = step === MAX_TOOL_STEPS
 
-        if (result.tool_calls && result.tool_calls.length > 0) {
+        if (isWrapUp) {
           messages.push({
-            role: 'assistant',
-            content: null,
-            tool_calls: result.tool_calls,
+            role: 'user',
+            content: 'You have all the data you need. Write your final health report now — do NOT call any more tools.',
           })
+        }
 
-          for (const call of result.tool_calls) {
+        let result!: AiResponse
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            result = await (env.AI.run as Function)(
+              MODEL,
+              isWrapUp ? { messages } : { messages, tools },
+              { extraHeaders: { 'x-session-affinity': sessionId } },
+            ) as AiResponse
+            break
+          } catch (aiErr) {
+            const msg = aiErr instanceof Error ? aiErr.message : String(aiErr)
+            if (msg.includes('429') && attempt < 2) {
+              await new Promise(r => setTimeout(r, (attempt + 1) * 5000))
+              continue
+            }
+            throw aiErr
+          }
+        }
+
+        const validToolNames = new Set(tools.map(t => t.function.name))
+        const activeCalls: OaiToolCall[] = isWrapUp
+          ? []
+          : (result.tool_calls && result.tool_calls.length > 0)
+            ? result.tool_calls
+            : (parseLlamaInlineToolCalls(result.response ?? '', validToolNames) ?? [])
+
+        if (activeCalls.length > 0) {
+          messages.push({ role: 'assistant', content: null, tool_calls: activeCalls })
+
+          for (const call of activeCalls) {
             toolCallCount++
             let toolResult: unknown
             try {
@@ -118,12 +192,21 @@ Be concise. Use bullet points and short headers. Do not repeat raw JSON.`
             })
           }
         } else {
-          finalText = result.response ?? ''
+          finalText = result.response?.trim() ?? ''
           break
         }
       }
 
-      if (!finalText) finalText = '(Agent reached step limit without a final answer.)'
+      if (!finalText) {
+        const attempted = messages
+          .filter((m): m is AssistantMessage => m.role === 'assistant' && Array.isArray(m.tool_calls))
+          .flatMap(m => m.tool_calls ?? [])
+          .map(c => c.function.name)
+          .join(', ')
+        finalText = attempted
+          ? `The agent ran ${toolCallCount} tool call(s) (${attempted}) but could not produce a final report. Check the Docker endpoint URL.`
+          : 'No tools were called and no response was generated. The model may have failed to start.'
+      }
 
       return Response.json({ output: finalText, success: true, tool_calls: toolCallCount })
     } catch (err) {

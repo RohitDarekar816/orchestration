@@ -141,6 +141,22 @@ export function getToolDefinitions(): ToolDefinition[] {
         },
       },
     },
+    {
+      type: 'function',
+      function: {
+        name: 'delete_vm',
+        description: 'Permanently delete a QEMU VM and all its disks. The VM must be stopped first — call vm_action with action="stop" if it is running, then call this. Use purge=true to also remove the VM from backup and replication jobs.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name' },
+            vmid: { type: 'string', description: 'VM ID number' },
+            purge: { type: 'boolean', description: 'Also remove from backup/replication jobs. Default true.' },
+          },
+          required: ['node', 'vmid'],
+        },
+      },
+    },
     // ── VM Snapshots ──────────────────────────────────────────────────────────
     {
       type: 'function',
@@ -274,6 +290,22 @@ export function getToolDefinitions(): ToolDefinition[] {
     {
       type: 'function',
       function: {
+        name: 'delete_container',
+        description: 'Permanently delete an LXC container and all its storage. The container must be stopped first — call container_action with action="stop" if it is running, then call this.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name' },
+            vmid: { type: 'string', description: 'Container ID number' },
+            purge: { type: 'boolean', description: 'Also remove from backup/replication jobs. Default true.' },
+          },
+          required: ['node', 'vmid'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'list_container_snapshots',
         description: 'List all snapshots for an LXC container.',
         parameters: {
@@ -327,6 +359,21 @@ export function getToolDefinitions(): ToolDefinition[] {
         name: 'get_next_vmid',
         description: 'Get the next available VM ID from the cluster. Always call this before creating a new VM.',
         parameters: { type: 'object', properties: {} },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'wait_for_task',
+        description: 'Wait for an async Proxmox task (UPID) to complete. ALWAYS call this after clone_vm before calling set_vm_cloudinit, resize_vm_disk, or vm_action. Returns when the task succeeds, or throws if it fails.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name where the task is running' },
+            task_id: { type: 'string', description: 'Task UPID returned by clone_vm or other async operations' },
+          },
+          required: ['node', 'task_id'],
+        },
       },
     },
     {
@@ -398,6 +445,123 @@ export function getToolDefinitions(): ToolDefinition[] {
             vmid: { type: 'string', description: 'VM ID' },
           },
           required: ['node', 'vmid'],
+        },
+      },
+    },
+    // ── VM Config Update ──────────────────────────────────────────────────────
+    {
+      type: 'function',
+      function: {
+        name: 'update_vm_config',
+        description: 'Update hardware configuration of an existing VM: CPU cores, memory (MB), name, description, or tags. Most changes take effect immediately; CPU/memory changes on a running VM may require a reboot.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name' },
+            vmid: { type: 'string', description: 'VM ID number' },
+            cores: { type: 'string', description: 'Number of CPU cores, e.g. "4"' },
+            memory: { type: 'string', description: 'Memory in MB, e.g. "4096" for 4 GB' },
+            name: { type: 'string', description: 'New VM name' },
+            description: { type: 'string', description: 'VM description or notes' },
+            tags: { type: 'string', description: 'Semicolon-separated tags, e.g. "web;production"' },
+          },
+          required: ['node', 'vmid'],
+        },
+      },
+    },
+    // ── LXC Container Provisioning ────────────────────────────────────────────
+    {
+      type: 'function',
+      function: {
+        name: 'create_container',
+        description: 'Create a new LXC container from an OS template. Use list_storage_content(content="vztmpl") to find available templates first. Returns a task ID — call wait_for_task before starting the container.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name, e.g. "pve"' },
+            vmid: { type: 'string', description: 'Container ID from get_next_vmid' },
+            ostemplate: { type: 'string', description: 'Template storage path, e.g. "local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst"' },
+            hostname: { type: 'string', description: 'Container hostname' },
+            password: { type: 'string', description: 'Root password' },
+            storage: { type: 'string', description: 'Storage pool for rootfs, e.g. "local-lvm"' },
+            rootfs_size: { type: 'string', description: 'Root filesystem size in GB, e.g. "8". Default "8".' },
+            cores: { type: 'string', description: 'CPU cores, e.g. "2". Default "1".' },
+            memory: { type: 'string', description: 'Memory in MB, e.g. "1024". Default "512".' },
+            ip: { type: 'string', description: 'IP config: "dhcp" or "192.168.1.x/24,gw=192.168.1.1". Default "dhcp".' },
+            start: { type: 'string', description: 'Start container after creation: "1" or "0". Default "0".' },
+          },
+          required: ['node', 'vmid', 'ostemplate', 'hostname', 'password', 'storage'],
+        },
+      },
+    },
+    // ── LXC Config Update ─────────────────────────────────────────────────────
+    {
+      type: 'function',
+      function: {
+        name: 'update_container_config',
+        description: 'Update configuration of an existing LXC container: CPU cores, memory (MB), hostname, description, or tags.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name' },
+            vmid: { type: 'string', description: 'Container ID number' },
+            cores: { type: 'string', description: 'Number of CPU cores, e.g. "2"' },
+            memory: { type: 'string', description: 'Memory in MB, e.g. "2048"' },
+            hostname: { type: 'string', description: 'New container hostname' },
+            description: { type: 'string', description: 'Container description or notes' },
+            tags: { type: 'string', description: 'Semicolon-separated tags, e.g. "db;staging"' },
+          },
+          required: ['node', 'vmid'],
+        },
+      },
+    },
+    // ── LXC Snapshots ─────────────────────────────────────────────────────────
+    {
+      type: 'function',
+      function: {
+        name: 'create_container_snapshot',
+        description: 'Create a snapshot of an LXC container. The container can be running or stopped.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name' },
+            vmid: { type: 'string', description: 'Container ID number' },
+            snapname: { type: 'string', description: 'Snapshot name (no spaces, e.g. "snap1")' },
+            description: { type: 'string', description: 'Optional description' },
+          },
+          required: ['node', 'vmid', 'snapname'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'rollback_container_snapshot',
+        description: 'Roll back an LXC container to a previously created snapshot. WARNING: replaces current container state.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name' },
+            vmid: { type: 'string', description: 'Container ID number' },
+            snapname: { type: 'string', description: 'Snapshot name to roll back to' },
+          },
+          required: ['node', 'vmid', 'snapname'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'delete_container_snapshot',
+        description: 'Delete an LXC container snapshot.',
+        parameters: {
+          type: 'object',
+          properties: {
+            node: { type: 'string', description: 'Node name' },
+            vmid: { type: 'string', description: 'Container ID number' },
+            snapname: { type: 'string', description: 'Snapshot name to delete' },
+          },
+          required: ['node', 'vmid', 'snapname'],
         },
       },
     },
@@ -521,6 +685,7 @@ export async function executeTool(
         }
         if (r.type === 'vm' || r.type === 'lxc') {
           base.vmid = r.vmid
+          base.template = r.template === 1 || r.template === true
           base.cpu_percent = r.cpu !== undefined ? `${((r.cpu as number) * 100).toFixed(1)}%` : '-'
           base.memory = r.maxmem ? {
             used: toHuman(r.mem as number ?? 0),
@@ -626,6 +791,7 @@ export async function executeTool(
         vmid: vm.vmid,
         name: vm.name ?? `vm-${vm.vmid}`,
         status: vm.status,
+        template: vm.template === 1 || vm.template === true,
         cpu_percent: vm.status === 'running' ? `${((vm.cpu as number ?? 0) * 100).toFixed(2)}%` : 'off',
         memory: vm.status === 'running'
           ? { used: toHuman(vm.mem as number ?? 0), total: toHuman(vm.maxmem as number ?? 0) }
@@ -662,6 +828,14 @@ export async function executeTool(
       if (!validActions.includes(action)) throw new Error(`Invalid action: ${action}. Must be one of: ${validActions.join(', ')}`)
       const result = await pvePost(base, proxmoxToken, `/nodes/${node}/qemu/${vmid}/status/${action}`)
       return { task_id: result, action, vmid, node, message: `${action} command sent to VM ${vmid}` }
+    }
+
+    case 'delete_vm': {
+      const { node, vmid } = args as { node: string; vmid: string }
+      const purge = (args.purge as boolean) !== false // default true
+      const qs = purge ? '?purge=1&destroy-unreferenced-disks=1' : ''
+      const task = await pveDelete(base, proxmoxToken, `/nodes/${node}/qemu/${vmid}${qs}`)
+      return { task_id: task, vmid, node, message: `VM ${vmid} deletion started. All disks will be removed.` }
     }
 
     case 'list_containers': {
@@ -704,6 +878,14 @@ export async function executeTool(
       if (!validActions.includes(action)) throw new Error(`Invalid action: ${action}. Must be one of: ${validActions.join(', ')}`)
       const result = await pvePost(base, proxmoxToken, `/nodes/${node}/lxc/${vmid}/status/${action}`)
       return { task_id: result, action, vmid, node, message: `${action} command sent to container ${vmid}` }
+    }
+
+    case 'delete_container': {
+      const { node, vmid } = args as { node: string; vmid: string }
+      const purge = (args.purge as boolean) !== false // default true
+      const qs = purge ? '?purge=1&destroy-unreferenced-disks=1' : ''
+      const task = await pveDelete(base, proxmoxToken, `/nodes/${node}/lxc/${vmid}${qs}`)
+      return { task_id: task, vmid, node, message: `Container ${vmid} deletion started. All storage will be removed.` }
     }
 
     case 'get_container_config': {
@@ -778,6 +960,25 @@ export async function executeTool(
       return { next_vmid: String(data) }
     }
 
+    case 'wait_for_task': {
+      const { node, task_id } = args as { node: string; task_id: string }
+      const deadline = Date.now() + 50_000
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 5_000))
+        try {
+          const status = await pveGet(base, proxmoxToken, `/nodes/${node}/tasks/${encodeURIComponent(task_id)}/status`) as Record<string, unknown>
+          if (status.status === 'stopped') {
+            const exit = status.exitstatus as string
+            if (exit === 'OK') return { status: 'completed', message: 'Task completed successfully' }
+            throw new Error(`Task failed: ${exit}`)
+          }
+        } catch (err) {
+          if (err instanceof Error && err.message.startsWith('Task failed')) throw err
+        }
+      }
+      return { status: 'still_running', message: 'Task still running after 50s — disk may be large. Proceed with cloud-init config but do NOT start the VM yet.' }
+    }
+
     case 'clone_vm': {
       const { node, source_vmid, new_vmid, name, full, storage } = args as {
         node: string; source_vmid: string; new_vmid: string; name: string; full?: string; storage?: string
@@ -797,7 +998,11 @@ export async function executeTool(
         node: string; vmid: string; ciuser: string; cipassword: string
         sshkeys?: string; ipconfig0: string; nameserver?: string; searchdomain?: string
       }
-      const body: Record<string, string> = { ciuser, cipassword, ipconfig0 }
+      const body: Record<string, string> = {
+        ciuser, cipassword, ipconfig0,
+        // Enable QEMU guest agent so get_vm_ip works after boot
+        agent: '1',
+      }
       if (sshkeys) body.sshkeys = sshkeys
       if (nameserver) body.nameserver = nameserver
       if (searchdomain) body.searchdomain = searchdomain
@@ -806,7 +1011,7 @@ export async function executeTool(
         vmid, message: `Cloud-init configured on VM ${vmid}`,
         user: ciuser,
         ip_config: ipconfig0,
-        note: 'Password set successfully. Start the VM to apply cloud-init.',
+        note: 'QEMU guest agent enabled. Start the VM — cloud-init will apply network config on first boot.',
       }
     }
 
@@ -818,9 +1023,10 @@ export async function executeTool(
 
     case 'get_vm_ip': {
       const { node, vmid } = args as { node: string; vmid: string }
-      // Retry up to 3 times (15 s total) — guest agent takes time to start after boot
+      // Ubuntu cloud images take 60-90s to boot, run cloud-init, and start qemu-guest-agent.
+      // Poll every 30s for up to 3 attempts (90s total).
       const MAX_RETRIES = 3
-      const RETRY_DELAY_MS = 5_000
+      const RETRY_DELAY_MS = 30_000
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, RETRY_DELAY_MS))
         try {
@@ -842,12 +1048,17 @@ export async function executeTool(
           }
           const primary = ips.find(i => i.type === 'ipv4')?.ip
           if (primary) return { vmid, interfaces: ips, primary_ip: primary }
-          // No IP yet — retry
+          // Guest agent responded but no IPv4 yet — DHCP still pending, retry
         } catch {
-          // Guest agent not running yet — retry
+          // Guest agent not up yet — retry
         }
       }
-      return { vmid, primary_ip: 'not available — VM may still be booting, try again in a minute' }
+      return {
+        vmid,
+        primary_ip: null,
+        message: 'VM is running but IP could not be retrieved after 90s. The VM likely booted successfully. To find the IP: (1) Check your router admin page → DHCP client list, (2) Open the VM console in Proxmox and run: ip addr — or — (3) Run this again in 1-2 minutes.',
+        troubleshoot: 'If the VM consistently has no IP: verify the cloud-init drive is attached (Proxmox → VM → Hardware → look for CloudInit Drive), and confirm net0 uses bridge=vmbr0.',
+      }
     }
 
     case 'get_node_tasks': {
@@ -920,7 +1131,121 @@ export async function executeTool(
       }
     }
 
+    case 'update_vm_config': {
+      const { node, vmid } = args as { node: string; vmid: string }
+      const body: Record<string, string> = {}
+      if (args.cores) body.cores = String(args.cores)
+      if (args.memory) body.memory = String(args.memory)
+      if (args.name) body.name = args.name as string
+      if (args.description) body.description = args.description as string
+      if (args.tags) body.tags = args.tags as string
+      if (Object.keys(body).length === 0) throw new Error('No config changes specified. Provide at least one of: cores, memory, name, description, tags.')
+      await pvePut(base, proxmoxToken, `/nodes/${node}/qemu/${vmid}/config`, body)
+      return { vmid, updated: body, message: `VM ${vmid} configuration updated successfully.` }
+    }
+
+    case 'create_container': {
+      const { node, vmid, ostemplate, hostname, password, storage } = args as {
+        node: string; vmid: string; ostemplate: string; hostname: string; password: string; storage: string
+      }
+      const rootfsSize = (args.rootfs_size as string) ?? '8'
+      const ip = (args.ip as string) ?? 'dhcp'
+      const body: Record<string, string> = {
+        vmid,
+        ostemplate,
+        hostname,
+        password,
+        rootfs: `${storage}:${rootfsSize}`,
+        net0: `name=eth0,bridge=vmbr0,ip=${ip}`,
+        unprivileged: '1',
+      }
+      if (args.cores) body.cores = String(args.cores)
+      if (args.memory) body.memory = String(args.memory)
+      if (args.start) body.start = String(args.start)
+      const task = await pvePost(base, proxmoxToken, `/nodes/${node}/lxc`, body)
+      return { task_id: task, vmid, hostname, message: `Container ${vmid} (${hostname}) creation started. Call wait_for_task then container_action(start) when ready.` }
+    }
+
+    case 'update_container_config': {
+      const { node, vmid } = args as { node: string; vmid: string }
+      const body: Record<string, string> = {}
+      if (args.cores) body.cores = String(args.cores)
+      if (args.memory) body.memory = String(args.memory)
+      if (args.hostname) body.hostname = args.hostname as string
+      if (args.description) body.description = args.description as string
+      if (args.tags) body.tags = args.tags as string
+      if (Object.keys(body).length === 0) throw new Error('No config changes specified. Provide at least one of: cores, memory, hostname, description, tags.')
+      await pvePut(base, proxmoxToken, `/nodes/${node}/lxc/${vmid}/config`, body)
+      return { vmid, updated: body, message: `Container ${vmid} configuration updated successfully.` }
+    }
+
+    case 'create_container_snapshot': {
+      const { node, vmid, snapname, description } = args as { node: string; vmid: string; snapname: string; description?: string }
+      const body: Record<string, string> = { snapname }
+      if (description) body.description = description
+      const result = await pvePost(base, proxmoxToken, `/nodes/${node}/lxc/${vmid}/snapshot`, body)
+      return { task_id: result, snapname, vmid, node, message: `Snapshot "${snapname}" creation started for container ${vmid}` }
+    }
+
+    case 'rollback_container_snapshot': {
+      const { node, vmid, snapname } = args as { node: string; vmid: string; snapname: string }
+      const result = await pvePost(base, proxmoxToken, `/nodes/${node}/lxc/${vmid}/snapshot/${snapname}/rollback`)
+      return { task_id: result, snapname, vmid, node, message: `Rollback to snapshot "${snapname}" started for container ${vmid}` }
+    }
+
+    case 'delete_container_snapshot': {
+      const { node, vmid, snapname } = args as { node: string; vmid: string; snapname: string }
+      const result = await pveDelete(base, proxmoxToken, `/nodes/${node}/lxc/${vmid}/snapshot/${snapname}`)
+      return { task_id: result, snapname, vmid, node, message: `Snapshot "${snapname}" deleted from container ${vmid}` }
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`)
   }
+}
+
+// ── Dynamic tool selection ────────────────────────────────────────────────────
+// Returns only the tool subset relevant to the detected task intent.
+// Sending fewer tools = fewer input tokens on every LLM step.
+
+const TOOL_GROUPS: Record<string, Set<string>> = {
+  provision:     new Set(['get_next_vmid','wait_for_task','clone_vm','set_vm_cloudinit','resize_vm_disk','vm_action','get_vm_ip','list_vms','list_nodes','get_cluster_resources']),
+  lxc_provision: new Set(['get_next_vmid','wait_for_task','create_container','container_action','list_nodes','list_storage','list_storage_content']),
+  power:         new Set(['list_vms','list_containers','get_vm_status','vm_action','delete_vm','update_vm_config','container_action','delete_container','update_container_config','list_nodes']),
+  snapshot:      new Set(['list_vms','list_vm_snapshots','create_vm_snapshot','rollback_vm_snapshot','delete_vm_snapshot','list_nodes','list_containers','list_container_snapshots','create_container_snapshot','rollback_container_snapshot','delete_container_snapshot']),
+  lxc:           new Set(['list_nodes','list_containers','get_container_status','get_container_config','container_action','delete_container','list_container_snapshots','update_container_config']),
+  storage:       new Set(['list_nodes','list_storage','list_storage_content']),
+  network:       new Set(['list_nodes','list_node_network']),
+  tasks:         new Set(['list_nodes','get_node_tasks']),
+  overview:      new Set(['get_cluster_resources','get_cluster_status','list_nodes','get_node_status','list_vms','get_vm_status','get_vm_config','list_containers','get_container_status']),
+}
+
+export function getToolsForTask(task: string): ToolDefinition[] {
+  const all = getToolDefinitions()
+  let group: Set<string> | null = null
+
+  if (/\b(creat|provision|spin.?up|deploy|new)\b.{0,30}\bvm\b|\bvm\b.{0,30}\b(creat|provision|new)\b/i.test(task))
+    group = TOOL_GROUPS.provision
+  else if (/\b(creat|provision|spin.?up|deploy|new)\b.{0,30}\b(lxc|container)\b|\b(lxc|container)\b.{0,30}\b(creat|provision|new)\b/i.test(task))
+    group = TOOL_GROUPS.lxc_provision
+  else if (/\bsnapshot\b|\brollback\b|\brestore\b/i.test(task))
+    group = TOOL_GROUPS.snapshot
+  else if (/\b(delete|destroy|remove|wipe)\b.{0,30}\b(vm|machine|container|lxc)\b|\b(vm|machine|container|lxc)\b.{0,30}\b(delete|destroy|remove)\b/i.test(task))
+    group = TOOL_GROUPS.power
+  else if (/\b(update|change|set|resize|rename|modify)\b.{0,30}\b(vm|machine|container|lxc)\b.{0,40}\b(cpu|core|mem|ram|name|hostname|tag|desc)\b|\b(cpu|core|mem|ram|name|hostname|tag|desc)\b.{0,40}\b(vm|machine|container|lxc)\b/i.test(task))
+    group = TOOL_GROUPS.power
+  else if (/\b(start|stop|reboot|shutdown|reset|suspend|resume|restart)\b.{0,20}\b(vm|machine|container)\b|\b(vm|machine|container)\b.{0,20}\b(start|stop|reboot|shutdown)\b/i.test(task))
+    group = TOOL_GROUPS.power
+  else if (/\blxc\b|\bcontainer\b(?!.*docker)/i.test(task))
+    group = TOOL_GROUPS.lxc
+  else if (/\b(storage|disk\s+space|volume|iso\s|backup|datastore)\b/i.test(task))
+    group = TOOL_GROUPS.storage
+  else if (/\b(network|interface|bridge|ip.?address|vlan|bond|nic)\b/i.test(task))
+    group = TOOL_GROUPS.network
+  else if (/\b(task|log|history|recent\s+operation)\b/i.test(task))
+    group = TOOL_GROUPS.tasks
+  else if (/\b(overview|status|health|list|show|all|cluster|node|resource|how\s+many|what.*running)\b/i.test(task))
+    group = TOOL_GROUPS.overview
+
+  return group ? all.filter(t => group!.has(t.function.name)) : all
 }

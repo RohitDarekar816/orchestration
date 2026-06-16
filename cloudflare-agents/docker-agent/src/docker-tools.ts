@@ -90,6 +90,20 @@ export function getToolDefinitions(): ToolDefinition[] {
     {
       type: 'function',
       function: {
+        name: 'start_container',
+        description: 'Start a stopped container.',
+        parameters: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Container ID or name' },
+          },
+          required: ['id'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'stop_container',
         description: 'Stop a running container.',
         parameters: {
@@ -156,6 +170,21 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
     },
   ]
+}
+
+export function getToolsForTask(task: string): ToolDefinition[] {
+  const all = getToolDefinitions()
+  if (/\blog\b/i.test(task))
+    return all.filter(t => ['list_containers','get_container_logs'].includes(t.function.name))
+  if (/\b(start|stop|restart|remove|kill)\b/i.test(task))
+    return all.filter(t => ['list_containers','start_container','run_container','stop_container','remove_container'].includes(t.function.name))
+  if (/\bimage\b|\bpull\b|\bpush\b/i.test(task))
+    return all.filter(t => ['list_images'].includes(t.function.name))
+  if (/\bexec\b|\bshell\b|\bbash\b/i.test(task))
+    return all.filter(t => ['list_containers','exec_in_container'].includes(t.function.name))
+  if (/\b(cpu|memory|resource|stat|usage)\b/i.test(task))
+    return all.filter(t => ['list_containers','container_stats','docker_system_info'].includes(t.function.name))
+  return all
 }
 
 // ── Execution ─────────────────────────────────────────────────────────────────
@@ -280,6 +309,10 @@ export async function executeTool(
       await dockerPost(base, `/containers/${created.Id}/start`)
       return { id: created.Id, started: true }
     }
+
+    case 'start_container':
+      await dockerPost(base, `/containers/${encodeURIComponent(args.id as string)}/start`)
+      return { started: true }
 
     case 'stop_container':
       await dockerPost(base, `/containers/${encodeURIComponent(args.id as string)}/stop?t=10`)

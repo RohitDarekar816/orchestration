@@ -781,7 +781,8 @@ class CloudflareProxmoxAgentRunner:
         }
 
         worker_url = settings.cf_proxmox_agent_url.rstrip("/") + "/"
-        timeout = min(self.agent_run.max_runtime or 120, 300)
+        # Provisioning flow: clone(50s) + wait_for_task(50s) + boot(90s) + get_vm_ip retries = ~3 min
+        timeout = min(self.agent_run.max_runtime or 300, 420)
 
         try:
             await self._log("stdout", f"[cf-proxmox-agent] Calling Cloudflare Worker → {worker_url}")

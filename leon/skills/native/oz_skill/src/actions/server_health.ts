@@ -40,15 +40,15 @@ export const run: ActionFunction = async function (params) {
         network,
         agentType: 'cloudflare_server_health_agent',
         prompt: utterance || `Check full system health on ${ep.name}`,
-        maxRuntime: 120,
-        maxPollSeconds: 180,
+        maxRuntime: 180,
+        maxPollSeconds: 240,
       })
 
       await leon.answer({
         key: 'health_result',
         data: {
           server: ep.name,
-          logs: formatDockerOutput(output, ep.name),
+          logs: formatDockerOutput(output, ep.name, 'health'),
           agent_id: String(agentId),
           status,
         },
@@ -93,7 +93,7 @@ Print each section with a clear header. Flag any obvious problems (disk > 80%, f
       key: 'health_result',
       data: {
         server: serverLabel,
-        logs: formatDockerOutput(output, serverLabel),
+        logs: formatDockerOutput(output, serverLabel, 'health'),
         agent_id: String(agentId),
         status,
       },

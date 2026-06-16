@@ -13,17 +13,91 @@ import {
 
 // ── HTML formatter ────────────────────────────────────────────────────────────
 
-export function formatDockerOutput(raw: string, serverLabel: string): string {
+export function formatDockerOutput(raw: string, serverLabel: string, agentType = 'docker'): string {
   const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
   if (!lines.length) return '<p style="color:#888">No output.</p>'
 
   const parts: string[] = []
-
-  // Detect a table block (header row contains multiple ALL-CAPS column names)
-  const tableHeaderRe = /^(NAMES?|CONTAINER|IMAGE|STATUS|PORTS|COMMAND|CREATED|SIZE)(\s{2,}.+)?$/i
+  const dockerTableHeaderRe = /^(NAMES?|CONTAINER|IMAGE|STATUS|PORTS|COMMAND|CREATED|SIZE)(\s{2,}.+)?$/i
   let i = 0
+
   while (i < lines.length) {
     const line = lines[i]
+
+    // ── Code fence block ───────────────────────────────────────────────────
+    if (line.startsWith('```')) {
+      i++
+      const codeLines: string[] = []
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i])
+        i++
+      }
+      if (i < lines.length) i++ // consume closing fence
+      parts.push(
+        `<pre style="margin:8px 0;padding:10px 12px;background:#020617;border-radius:6px;` +
+        `font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all;` +
+        `border:1px solid #1e293b;color:#94a3b8">` +
+        codeLines.map(escHtml).join('\n') + `</pre>`
+      )
+      continue
+    }
+
+    // ── Markdown headings ──────────────────────────────────────────────────
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      const sizes = ['15px', '14px', '13px']
+      const mt = level === 1 ? '14px 0 6px' : '10px 0 4px'
+      const border = level === 1 ? 'border-bottom:1px solid #334155;padding-bottom:4px;' : ''
+      parts.push(
+        `<p style="margin:${mt};font-size:${sizes[level - 1]};font-weight:600;color:#f1f5f9;${border}">` +
+        renderInline(headingMatch[2]) + `</p>`
+      )
+      i++
+      continue
+    }
+
+    // ── HEALTHY / WARNING / CRITICAL status badge ──────────────────────────
+    const statusMatch = line.match(/^(HEALTHY|WARNING|CRITICAL)\b/i)
+    if (statusMatch) {
+      const lvl = statusMatch[1].toUpperCase() as 'HEALTHY' | 'WARNING' | 'CRITICAL'
+      const color = lvl === 'HEALTHY' ? '#22c55e' : lvl === 'WARNING' ? '#f59e0b' : '#ef4444'
+      const bg    = lvl === 'HEALTHY' ? '#052e16' : lvl === 'WARNING' ? '#1c1400' : '#1c0a0a'
+      parts.push(
+        `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;` +
+        `background:${bg};border:1px solid ${color};margin:8px 0">` +
+        `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>` +
+        `<span style="font-size:13px;font-weight:600;color:${color}">${renderInline(line)}</span>` +
+        `</div>`
+      )
+      i++
+      continue
+    }
+
+    // ── Markdown pipe table ────────────────────────────────────────────────
+    if (/^\|.+\|$/.test(line)) {
+      const headers = line.split('|').map((c) => c.trim()).filter(Boolean)
+      i++
+      if (i < lines.length && /^\|[\s\-|:]+\|$/.test(lines[i])) i++ // skip separator
+      const rows: string[][] = []
+      while (i < lines.length && /^\|.+\|$/.test(lines[i])) {
+        rows.push(lines[i].split('|').map((c) => c.trim()).filter(Boolean))
+        i++
+      }
+      const thStyle = 'padding:6px 10px;text-align:left;background:#1e293b;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.05em'
+      const tdStyle = 'padding:6px 10px;font-size:12px;border-top:1px solid #334155;color:#e2e8f0'
+      const ths = headers.map((h) => `<th style="${thStyle}">${escHtml(h)}</th>`).join('')
+      const trs = rows.map((row) => {
+        const tds = headers.map((_, ci) => `<td style="${tdStyle}">${renderInline(row[ci] ?? '')}</td>`).join('')
+        return `<tr>${tds}</tr>`
+      }).join('')
+      parts.push(
+        `<div style="overflow-x:auto;margin:8px 0">` +
+        `<table style="width:100%;border-collapse:collapse;font-family:monospace;background:#0f172a;border-radius:6px;overflow:hidden">` +
+        `<thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`
+      )
+      continue
+    }
 
     // ── Bullet-list item ───────────────────────────────────────────────────
     if (/^[-*•]\s+/.test(line)) {
@@ -33,20 +107,19 @@ export function formatDockerOutput(raw: string, serverLabel: string): string {
         i++
       }
 
-      // Detect if these are metric key-value pairs (e.g. "CPU: 1.2%", "Memory: 120 MB / 8 GB")
-      // rather than container names. Heuristic: most items contain ": " with a value after it.
+      // Heuristic: metric key-value pairs vs plain name list
       const isMetrics = items.filter((t) => /:\s*\S/.test(t)).length > items.length / 2
 
       if (isMetrics) {
         const rows = items.map((item) => {
           const colon = item.indexOf(': ')
-          if (colon === -1) return `<tr><td colspan="2" style="padding:4px 8px;font-size:12px;color:#94a3b8">${escHtml(item)}</td></tr>`
+          if (colon === -1) return `<tr><td colspan="2" style="padding:4px 8px;font-size:12px;color:#94a3b8">${renderInline(item)}</td></tr>`
           const key = item.slice(0, colon)
           const val = item.slice(colon + 2)
           return (
             `<tr>` +
             `<td style="padding:4px 8px;font-size:11px;color:#64748b;white-space:nowrap">${escHtml(key)}</td>` +
-            `<td style="padding:4px 8px;font-size:12px;color:#e2e8f0;font-weight:500">${escHtml(val)}</td>` +
+            `<td style="padding:4px 8px;font-size:12px;color:#e2e8f0;font-weight:500">${renderInline(val)}</td>` +
             `</tr>`
           )
         }).join('')
@@ -55,24 +128,22 @@ export function formatDockerOutput(raw: string, serverLabel: string): string {
           `<tbody>${rows}</tbody></table>`
         )
       } else {
-        // Container name list — green status dot per item
-        const dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:8px;vertical-align:middle"></span>'
+        const dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:8px;vertical-align:middle;flex-shrink:0"></span>'
         const lis = items.map((name) =>
-          `<li style="padding:4px 0;display:flex;align-items:center">${dot}<code style="font-size:13px">${escHtml(name)}</code></li>`
+          `<li style="padding:4px 0;display:flex;align-items:center">${dot}<span style="font-size:13px">${renderInline(name)}</span></li>`
         ).join('')
         parts.push(`<ul style="list-style:none;margin:8px 0;padding:0">${lis}</ul>`)
       }
       continue
     }
 
-    // ── Table block ────────────────────────────────────────────────────────
-    if (tableHeaderRe.test(line) && i + 1 < lines.length) {
+    // ── Docker CLI table block ─────────────────────────────────────────────
+    if (dockerTableHeaderRe.test(line) && i + 1 < lines.length) {
       const headers = line.split(/\s{2,}/).map((h) => h.trim()).filter(Boolean)
       i++
       const rows: string[][] = []
       while (i < lines.length && lines[i] && !lines[i].startsWith('#')) {
         const cols = lines[i].split(/\s{2,}/).map((c) => c.trim())
-        // Pad/truncate to match header count
         while (cols.length < headers.length) cols.push('')
         rows.push(cols.slice(0, headers.length))
         i++
@@ -109,61 +180,67 @@ export function formatDockerOutput(raw: string, serverLabel: string): string {
         items.push(lines[i].replace(/^\d+\.\s+/, ''))
         i++
       }
-      const lis = items.map((t) => `<li style="padding:3px 0;font-size:13px">${escHtml(t)}</li>`).join('')
+      const lis = items.map((t) => `<li style="padding:3px 0;font-size:13px">${renderInline(t)}</li>`).join('')
       parts.push(`<ol style="margin:8px 0 8px 18px;padding:0">${lis}</ol>`)
       continue
     }
 
-    // ── Log lines block (timestamped or looks like a log entry) ───────────
-    // Collect consecutive lines that look like raw log output:
-    // timestamps (2024-01-01T..., [2024-...], numbers), or lines that are
-    // clearly not prose (contain | [ ] = : sequences typical of log lines).
+    // ── Log lines block ────────────────────────────────────────────────────
     const isLogLine = (l: string) =>
-      /^\d{4}-\d{2}-\d{2}/.test(l) ||           // ISO timestamp prefix
-      /^\[\d{4}-\d{2}-\d{2}/.test(l) ||          // [timestamp] prefix
-      /^[A-Z]{3,}\s+\d/.test(l) ||               // "INFO 2024..." style
-      /^\d+\.\d+\.\d+\.\d+/.test(l) ||           // IP address log line
-      /\[(?:INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\]/.test(l) // log level bracket
+      /^\d{4}-\d{2}-\d{2}/.test(l) ||
+      /^\[\d{4}-\d{2}-\d{2}/.test(l) ||
+      /^[A-Z]{3,}\s+\d/.test(l) ||
+      /^\d+\.\d+\.\d+\.\d+/.test(l) ||
+      /\[(?:INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\]/.test(l)
 
     if (isLogLine(line)) {
       const logLines: string[] = []
       while (i < lines.length && (isLogLine(lines[i]) || /^[-\w]/.test(lines[i]))) {
         logLines.push(lines[i])
         i++
-        // Stop collecting if we hit a clearly non-log line (prose sentence)
         if (i < lines.length && /^(There|The|Here|All|No |Running|Stopped|Total)/.test(lines[i])) break
       }
       parts.push(
         `<pre style="margin:8px 0;padding:10px 12px;background:#020617;border-radius:6px;` +
         `font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all;` +
         `border:1px solid #1e293b;color:#94a3b8">` +
-        logLines.map(escHtml).join('\n') +
-        `</pre>`
+        logLines.map(escHtml).join('\n') + `</pre>`
       )
       continue
     }
 
     // ── Plain text paragraph ───────────────────────────────────────────────
-    parts.push(`<p style="margin:6px 0;font-size:13px;line-height:1.5">${escHtml(line)}</p>`)
+    parts.push(`<p style="margin:6px 0;font-size:13px;line-height:1.5">${renderInline(line)}</p>`)
     i++
   }
 
+  const icons: Record<string, string>  = { docker: '🐳', health: '❤️', proxmox: '🖥️' }
+  const labels: Record<string, string> = { docker: 'Docker', health: 'Health', proxmox: 'Proxmox' }
+  const icon      = icons[agentType]  ?? '🖥️'
+  const typeLabel = labels[agentType] ?? agentType
+
   const header =
     `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #334155">` +
-    `<span style="font-size:18px">🐳</span>` +
-    `<span style="font-weight:600;font-size:14px">Docker — <code style="font-size:13px;font-weight:400">${escHtml(serverLabel)}</code></span>` +
+    `<span style="font-size:18px">${icon}</span>` +
+    `<span style="font-weight:600;font-size:14px">${typeLabel} — <code style="font-size:13px;font-weight:400">${escHtml(serverLabel)}</code></span>` +
     `</div>`
 
   return (
     `<div style="background:#0f172a;color:#e2e8f0;border-radius:8px;padding:14px 16px;font-family:monospace;border:1px solid #1e293b">` +
-    header +
-    parts.join('') +
-    `</div>`
+    header + parts.join('') + `</div>`
   )
 }
 
 function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function renderInline(s: string): string {
+  let out = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  out = out.replace(/`([^`]+)`/g, '<code style="background:#1e293b;padding:1px 4px;border-radius:3px;font-size:11px">$1</code>')
+  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  return out
 }
 
 export const run: ActionFunction = async function (params) {

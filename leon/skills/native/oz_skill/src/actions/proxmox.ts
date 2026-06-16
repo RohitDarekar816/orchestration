@@ -56,15 +56,15 @@ export const run: ActionFunction = async function (params) {
       network,
       agentType: 'cloudflare_proxmox_agent',
       prompt: utterance || `Show overall status of Proxmox cluster on ${ep.name}`,
-      maxRuntime: 240,
-      maxPollSeconds: 300,
+      maxRuntime: 360,
+      maxPollSeconds: 420,
     })
 
     await leon.answer({
       key: 'proxmox_result',
       data: {
         server: ep.name,
-        logs: formatDockerOutput(output, ep.name),
+        logs: formatDockerOutput(output, ep.name, 'proxmox'),
         agent_id: String(agentId),
         status,
       },
