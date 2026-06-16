@@ -895,6 +895,8 @@ export default class PulseManager {
         'Generate only concrete proactive matters Leon can execute autonomously right now without owner clarification.',
         'Use only the provided memory, context, recent conversation, and self-model signals.',
         'Do not generate destructive, expensive, or socially sensitive actions.',
+        'NEVER create matters for infrastructure operations: VM creation/deletion/management, LXC container operations, Docker management, server health checks, Proxmox tasks, or any task that requires an external API the autonomous agent does not have direct access to. These are handled by Leon\'s dedicated skill system and external agents — they are already being processed when the owner requests them.',
+        'NEVER create matters that duplicate an action the owner explicitly requested in the recent conversation — if the owner said "delete X" and the skill is already executing it, do not queue another matter for the same action.',
         'If a matter appears suppressed, declined, stale, duplicated, or weakly evidenced, do not include it.',
         'Each matter must represent one autonomous ReAct turn candidate.',
         'Return JSON with this exact shape:',
@@ -1051,7 +1053,8 @@ export default class PulseManager {
       `${PULSE_REACT_SENTINEL} Autonomous task.`,
       'This task was initiated by Leon proactively.',
       'Use current context, memory, and tools to help the owner.',
-      'Do not ask the owner for clarification. If you cannot proceed safely with the available evidence, stop briefly and explain the block.',
+      'Do not ask the owner for clarification.',
+      'IMPORTANT: If you lack the tools or context to complete this task (e.g. it requires external APIs, infrastructure access, or actions outside your available tools), output exactly one line: "BLOCKED: <one-sentence reason>". Do NOT write multi-paragraph explanations. Do NOT mention model limitations, alternative models, or speculate about capabilities. Just state BLOCKED and the single reason.',
       `Task: ${matter.turnPrompt}`,
       `Why this matters: ${matter.why}`
     ].join('\n')
