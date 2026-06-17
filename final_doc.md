@@ -1,10 +1,10 @@
 # Oz — AI Agent Orchestration Platform
 ### Product & Technical Documentation
 
-**Version:** 1.0  
+**Version:** 1.2  
 **Date:** June 2026  
-**Company:** AIT GLOBAL INC 
-**Contact:** rohit.darekar@aitglobal.inc
+**Company:** AIT GLOBAL INC / Afintrix  
+**Contact:** info@afintrix.com
 
 ---
 
@@ -19,7 +19,7 @@
 7. [Key Features](#7-key-features)
 8. [Cloudflare Edge AI Agents](#8-cloudflare-edge-ai-agents)
 9. [Security & Compliance](#9-security--compliance)
-10. [Agent Roadmap — 100 Agents](#10-agent-roadmap--100-agents)
+10. [Agent Roadmap — 101 Agents](#10-agent-roadmap--101-agents)
 11. [Tech Stack](#11-tech-stack)
 12. [Deployment](#12-deployment)
 13. [API Reference](#13-api-reference)
@@ -156,6 +156,7 @@ Leon formats response as structured HTML card
 |---|---|
 | Docker | "How many containers are running on prod?" / "Show logs for nginx" / "What are the stats for the API container?" |
 | Server Health | "Check the health of AITLP-371" / "Is the production server healthy?" |
+| Proxmox VE | "List all VMs on the cluster" / "Create a new Ubuntu VM named web-01" / "Delete the VM rohit-test-vm" / "Show storage usage" |
 | Deployments | "Deploy /var/www/api on prod-web" / "Restart the web service" |
 | App Logs | "Show me the last 100 nginx errors" / "Find 502 errors from today" |
 | Bash | "Run df -h on staging" / "What processes are using the most CPU?" |
@@ -179,10 +180,10 @@ Leon formats response as structured HTML card
          │              LEON AI ASSISTANT                     │
          │  ┌─────────────┐  ┌──────────────┐  ┌──────────┐  │
          │  │ NLU Pipeline│  │ Skill Router │  │  LLM     │  │
-         │  │ (Utterance  │─▶│ (oz_skill)   │─▶│ (Llama / │  │
-         │  │  parsing)   │  │              │  │  Mistral) │  │
+         │  │ (Utterance  │─▶│ (oz_skill)   │─▶│ (Llama   │  │
+         │  │  parsing)   │  │              │  │  8B CF)  │  │
          │  └─────────────┘  └──────┬───────┘  └──────────┘  │
-         │                          │ 13 skill actions         │
+         │                          │ 14 skill actions         │
          └──────────────────────────┼──────────────────────────┘
                                     │ POST /api/agents/launch
          ┌──────────────────────────▼──────────────────────────┐
@@ -207,7 +208,8 @@ Leon formats response as structured HTML card
        │  │                     │  │                        │ │
        │  │  cf-docker-agent    │  │  opencode (default)    │ │
        │  │  cf-server-health   │  │  claude-code           │ │
-       │  │  + 98 planned       │  │  codex / gemini-cli    │ │
+       │  │  cf-proxmox-agent   │  │  codex / gemini-cli    │ │
+       │  │  + 97 planned       │  │  oz-local (SSH)        │ │
        │  │                     │  │  oz-local (SSH)        │ │
        │  │  Workers AI         │  │  commandcode           │ │
        │  │  (Llama 4 Scout)    │  │  custom agents         │ │
@@ -235,7 +237,7 @@ For SSH-connected servers or tasks requiring a full shell environment, Oz spins 
 Leon's NLU pipeline is a multi-stage system:
 
 1. **Utterance classification** — Leon's built-in NLU classifies the utterance into a skill/action bucket using a trained intent model
-2. **Entity extraction** — An action-calling LLM (Llama/Mistral via OpenRouter) extracts structured parameters: server name, container name, log count, command, URL, etc.
+2. **Entity extraction** — An action-calling LLM (Llama 3.1 8B via Cloudflare Workers AI) extracts structured parameters: server name, container name, log count, command, URL, etc.
 3. **`resolveDockerTarget()`** — A 6-step decision tree that resolves the target server from the extracted entities:
    - Exact name match against registered endpoints
    - Name match against SSH servers
@@ -289,12 +291,23 @@ Save reusable agent configurations as Skills. A Skill is a named, versioned comb
 Admin and member roles. Each user's resources (servers, secrets, agents) are isolated by user ID. Admins can view all activity across the team.
 
 ### 7.10 Structured HTML Responses
-Oz doesn't just dump raw text. Agent output is automatically formatted into clean, readable HTML cards in the Leon chat UI:
+Oz doesn't just dump raw text. Agent output is automatically formatted into clean, readable HTML cards in the Leon chat UI via a unified `formatDockerOutput()` renderer:
+- Agent-type header icons: 🐳 Docker, ❤️ Server Health, 🖥️ Proxmox
+- HEALTHY / WARNING / CRITICAL status badges (colour-coded)
+- Markdown headings (`#`, `##`, `###`) rendered as styled section headers
+- Inline markdown: `**bold**`, `*italic*`, `` `code` `` all rendered correctly
+- Code fence blocks (` ``` `) rendered as scrollable `<pre>` blocks
+- Pipe tables rendered as styled HTML tables
 - Container lists with green/red status dots
-- Docker `ps` tables with colour-coded rows
 - Log lines rendered in dark `<pre>` blocks with timestamps
 - Stats formatted as two-column key-value tables
 - Error messages in styled alert boxes
+
+### 7.11 Autonomous Pulse Manager Guardrails
+Leon includes an autonomous background agent (Pulse Manager) that proactively plans and executes tasks. Oz adds guardrails to prevent it from interfering with skill-dispatched infrastructure work:
+- Infrastructure operations (VM/LXC/Docker/Proxmox/server health) are explicitly blocked from the Pulse Manager's task queue — they are handled by dedicated edge agents
+- Tasks the owner just dispatched via a skill are not re-queued autonomously
+- If a matter slips through with no available tools, the model responds with a single-line `BLOCKED:` instead of hallucinating verbose explanations
 
 ---
 
@@ -331,7 +344,7 @@ Leon → Oz API → Cloudflare Worker (edge, <100ms)
 #### `cloudflare_docker_agent`
 **Deployed:** `https://cf-docker-agent.rohit-darekar.workers.dev`
 
-Full Docker container management via Docker Engine API. 10 tools:
+Full Docker container management via Docker Engine API. 11 tools:
 
 | Tool | What it does |
 |---|---|
@@ -340,6 +353,7 @@ Full Docker container management via Docker Engine API. 10 tools:
 | `get_container_logs` | Fetch stdout/stderr with exact tail count |
 | `container_stats` | CPU%, memory used/limit/%, network I/O, block I/O, PIDs |
 | `run_container` | Create and start a new container |
+| `start_container` | Start an existing stopped container |
 | `stop_container` | Gracefully stop a running container |
 | `remove_container` | Remove a container (force option) |
 | `list_images` | List Docker images on the host |
@@ -359,7 +373,33 @@ Comprehensive server health monitoring via Docker Engine API + container exec. 5
 | `get_resource_usage` | Per-container CPU% and memory (all running containers, in parallel) |
 | `exec_in_container` | `df -h` for disk, `free -h` for RAM, `uptime` for load average |
 
-**Health report includes:** Overall status (HEALTHY/WARNING/CRITICAL), host info, container summary, per-container resource usage, disk, load average, and flagged warnings.
+**Health report includes:** Overall status (HEALTHY/WARNING/CRITICAL), host info, container summary, per-container resource usage, disk, load average, and flagged warnings. Max runtime: 180s with 240s poll window.
+
+#### `cloudflare_proxmox_agent`
+**Deployed:** `https://cf-proxmox-agent.rohit-darekar.workers.dev`
+
+Full Proxmox VE hypervisor management via Proxmox REST API. **35 tools across 8 categories:**
+
+| Category | Tools |
+|---|---|
+| Cluster (2) | `get_cluster_status`, `get_cluster_resources` |
+| Nodes (4) | `list_nodes`, `get_node_status`, `list_node_network`, `get_node_tasks` |
+| VMs (6) | `list_vms`, `get_vm_status`, `get_vm_config`, `vm_action`, `delete_vm`, `update_vm_config` |
+| VM Snapshots (4) | `list_vm_snapshots`, `create_vm_snapshot`, `rollback_vm_snapshot`, `delete_vm_snapshot` |
+| LXC Containers (7) | `list_containers`, `get_container_status`, `get_container_config`, `container_action`, `delete_container`, `update_container_config`, `list_container_snapshots` |
+| LXC Snapshots (3) | `create_container_snapshot`, `rollback_container_snapshot`, `delete_container_snapshot` |
+| Storage (2) | `list_storage`, `list_storage_content` |
+| Provisioning (7) | `get_next_vmid`, `clone_vm`, `wait_for_task`, `set_vm_cloudinit`, `resize_vm_disk`, `get_vm_ip`, `create_container` |
+
+**Full CRUD** for both QEMU VMs and LXC containers: Create, Read, Update (CPU/RAM/name/tags), Delete.
+
+**VM Provisioning flow:** `list_vms` (find template) → `get_next_vmid` → `clone_vm` → `wait_for_task` → `set_vm_cloudinit` → `resize_vm_disk` → `vm_action(start)` → `get_vm_ip` (up to 90s DHCP wait).
+
+**LXC Provisioning flow:** `list_storage_content` (find OS template) → `get_next_vmid` → `create_container` → `wait_for_task` → `container_action(start)`.
+
+**Dynamic tool selection:** 9 intent groups (`provision`, `lxc_provision`, `power`, `snapshot`, `lxc`, `storage`, `network`, `tasks`, `overview`) — only the relevant subset of tools is sent per request, cutting input tokens by 75–80%.
+
+**Security:** Cryptographically random 16-char passwords generated per-provision; QEMU guest agent always enabled; `purge=1&destroy-unreferenced-disks=1` on delete. Max runtime: 360s with 420s poll window.
 
 ### 8.3 Edge Agent Advantages
 
@@ -370,6 +410,8 @@ Comprehensive server health monitoring via Docker Engine API + container exec. 5
 | Idle cost | Docker image pulled per run | Zero — billing per request |
 | Infrastructure required | Docker socket on Oz host | Just an HTTP endpoint on target |
 | Scalability | Limited by host Docker | Cloudflare global scale |
+| Token efficiency | Full prompt every step | Dynamic tool selection (75–80% fewer input tokens) |
+| LLM cache | None | `x-session-affinity` header pins all steps to same Workers AI instance for prompt cache hits |
 
 ---
 
@@ -408,23 +450,24 @@ No SSH credentials, no database access, no user identity — edge agents operate
 
 ---
 
-## 10. Agent Roadmap — 100 Agents
+## 10. Agent Roadmap — 101 Agents
 
-Oz has a planned roadmap of 100 purpose-built Cloudflare edge agents across 10 categories. 3 are already live.
+Oz has a planned roadmap of 101 purpose-built Cloudflare edge agents across 10 categories. **4 are already live.**
 
-| Category | Agents | Examples |
-|---|---|---|
-| Infrastructure & Ops | 15 | Server health ✅, disk usage, process management, cron, systemd, log search |
-| Docker & Containers | 10 | Docker ✅, Compose, images, volumes, networks, registry, swarm |
-| Application & Deployment | 12 | Deploy, rollback, nginx, PM2, feature flags, smoke tests |
-| Database & Storage | 10 | Postgres, MySQL, Redis, MongoDB, S3, migrations |
-| Security & Compliance | 10 | SSL audit, firewall, CVE scan, SSH hardening, fail2ban |
-| Networking & DNS | 8 | DNS lookup, ping, port scan, traceroute, VPN status |
-| Monitoring & Alerting | 10 | Grafana, Prometheus, Sentry, anomaly detection, incident management |
-| AI & Productivity | 10 | RAG over docs, code review, summarisation, changelog generation |
-| Web & APIs | 8 | Website check, API testing, screenshots, PageSpeed |
-| CI/CD & Git | 7 | GitHub/GitLab, PR review, dependency audit, release tagging |
-| **Total** | **100** | **3 built, 97 planned** |
+| Category | Agents | Built | Examples |
+|---|---|---|---|
+| Infrastructure & Ops | 15 | ✅ ✅ | Server health ✅, disk usage, process management, cron, systemd, log search |
+| Docker & Containers | 10 | ✅ | Docker ✅ (11 tools), Compose, images, volumes, networks, registry, swarm |
+| Proxmox VE | 1 | ✅ | VM & LXC full CRUD ✅ (35 tools: create/read/update/delete VMs and containers, snapshots, provisioning) |
+| Application & Deployment | 12 | 📋 | Deploy, rollback, nginx, PM2, feature flags, smoke tests |
+| Database & Storage | 10 | 📋 | Postgres, MySQL, Redis, MongoDB, S3, migrations |
+| Security & Compliance | 10 | 📋 | SSL audit, firewall, CVE scan, SSH hardening, fail2ban |
+| Networking & DNS | 8 | 📋 | DNS lookup, ping, port scan, traceroute, VPN status |
+| Monitoring & Alerting | 10 | 📋 | Grafana, Prometheus, Sentry, anomaly detection, incident management |
+| AI & Productivity | 10 | 📋 | RAG over docs, code review, summarisation, changelog generation |
+| Web & APIs | 8 | 📋 | Website check, API testing, screenshots, PageSpeed |
+| CI/CD & Git | 7 | 📋 | GitHub/GitLab, PR review, dependency audit, release tagging |
+| **Total** | **101** | **4 built** | **97 planned** |
 
 Each new agent takes 2–4 hours to build and deploy — the architecture is fully templated. The Cloudflare Worker pattern, backend runner, Leon action, and locale entries are all standardised.
 
@@ -439,7 +482,7 @@ Each new agent takes 2–4 hours to build and deploy — the architecture is ful
 | **Cache / Queue** | Redis 7 | Celery broker, real-time pub/sub for log streaming |
 | **Task Queue** | Celery + Celery Beat | Async agent execution, cron scheduling |
 | **AI Assistant** | Leon (open-source) | Production NLU pipeline, WebSocket chat, skill system |
-| **NLU / LLM** | Llama 3.1 / Mistral via OpenRouter | Intent classification and entity extraction |
+| **NLU / LLM** | Cloudflare Workers AI — Llama 3.1 8B (fp8-fast) | Zero-cost inference for Leon NLU and entity extraction; same CF account as edge agents |
 | **Edge AI** | Cloudflare Workers AI (Llama 4 Scout 17B) | Sub-100ms AI inference at global edge |
 | **Edge Runtime** | Cloudflare Workers (TypeScript) | Serverless, globally distributed, zero idle cost |
 | **Leon Skill** | TypeScript (Vite + TSX) | Type-safe, compiled skill with full SDK support |
@@ -483,6 +526,7 @@ That's it. The full stack — API, database, worker, scheduler, Leon AI, and web
 | `OPENROUTER_API_KEY` | LLM provider for Leon's NLU and entity extraction |
 | `CF_DOCKER_AGENT_URL` | Deployed URL of the Cloudflare Docker Agent worker |
 | `CF_SERVER_HEALTH_AGENT_URL` | Deployed URL of the Cloudflare Server Health Agent worker |
+| `CF_PROXMOX_AGENT_URL` | Deployed URL of the Cloudflare Proxmox Agent worker |
 | `CLOUDFLARE_API_TOKEN` | Token for deploying new Cloudflare Workers |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account identifier |
 | `SECRET_KEY` | JWT signing secret (change in production) |
@@ -687,14 +731,16 @@ oz/
 │       └── services/           # agent_runner, server_service, skill_service,
 │                               #   audit_service, secret_service
 ├── cloudflare-agents/          # Edge AI workers
-│   ├── docker-agent/           # ✅ Docker container management
-│   └── server-health-agent/    # ✅ Server health monitoring
+│   ├── docker-agent/           # ✅ Docker container management (11 tools)
+│   ├── server-health-agent/    # ✅ Server health monitoring (5 tools)
+│   └── proxmox-agent/          # ✅ Proxmox VE management (35 tools, full CRUD)
 ├── leon/                       # Leon AI assistant
 │   └── skills/native/oz_skill/
-│       ├── skill.json          # 13 action definitions
-│       ├── src/actions/        # 13 TypeScript action implementations
+│       ├── skill.json          # 14 action definitions
+│       ├── src/actions/        # 14 TypeScript action implementations
 │       │   ├── docker_logs.ts  # Docker queries → CF docker agent
 │       │   ├── server_health.ts# Health checks → CF health agent
+│       │   ├── proxmox.ts      # Proxmox management → CF proxmox agent
 │       │   ├── deploy.ts       # Deployments
 │       │   ├── run_bash.ts     # Arbitrary bash
 │       │   ├── app_logs.ts     # Application logs
@@ -720,14 +766,20 @@ oz/
 | Term | Definition |
 |---|---|
 | **Agent Run** | A single execution of an AI agent for a specific task. Has a lifecycle: PENDING → RUNNING → COMPLETED/FAILED |
+| **Dynamic Tool Selection** | Per-request routing that sends only the relevant tool subset to the LLM, reducing input tokens by 75–80% |
 | **Edge Agent** | A Cloudflare Worker that runs AI inference at the network edge, with no cold start and global distribution |
+| **formatDockerOutput()** | The unified HTML renderer in Leon's oz_skill that formats all CF agent responses into styled dark-theme cards |
 | **Leon** | The open-source AI assistant that provides the natural language interface. Handles NLU, routing, and response formatting |
 | **oz-local** | The built-in Oz agent that can SSH into servers and execute commands. The fallback for all SSH-based operations |
-| **oz_skill** | The Leon skill plugin that connects Leon's NLU to the Oz API. Contains 13 action implementations in TypeScript |
+| **oz_skill** | The Leon skill plugin that connects Leon's NLU to the Oz API. Contains 14 action implementations in TypeScript |
+| **Proxmox VE** | An open-source hypervisor platform (Type 1) for running QEMU/KVM VMs and LXC containers. Oz's Proxmox agent provides full CRUD management via its REST API |
+| **Pulse Manager** | Leon's autonomous background agent that proactively plans and executes tasks. Oz adds guardrails to block infrastructure operations from its queue — those are handled by dedicated edge agents |
+| **QEMU Guest Agent** | A daemon running inside a Proxmox VM that allows the host to query the VM's network interfaces. Oz always enables it (`agent=1`) during cloud-init provisioning so IP retrieval works reliably |
 | **resolveDockerTarget()** | The routing function that maps a natural language server reference (e.g., "AITLP-371") to a registered infrastructure target |
 | **Skill** | A saved, named agent configuration. Reusable prompt templates + agent type + env vars |
-| **Workers AI** | Cloudflare's serverless AI inference service. Oz uses Llama 4 Scout 17B for all edge agent reasoning |
+| **wait_for_task** | A Proxmox agent tool that polls a Proxmox UPID (task ID) until the async operation completes. Required after clone_vm/create_container before any subsequent config steps |
+| **Workers AI** | Cloudflare's serverless AI inference service. Oz uses Llama 4 Scout 17B for all edge agent reasoning and Llama 3.1 8B (fp8-fast) for Leon NLU |
 
 ---
 
-*Built with care by Afintrix. For demos, partnerships, or investment inquiries: info@afintrix.com*
+*Built with care by AIT GLOBAL INC / Afintrix. For demos, partnerships, or investment inquiries: info@afintrix.com*
