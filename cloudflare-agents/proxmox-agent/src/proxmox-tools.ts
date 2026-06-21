@@ -125,7 +125,7 @@ export function getToolDefinitions(): ToolDefinition[] {
       type: 'function',
       function: {
         name: 'vm_action',
-        description: 'Perform a power action on a VM: start, shutdown (graceful), stop (force kill), reboot, reset (hard reset), suspend, or resume.',
+        description: 'Perform a power action on an EXISTING, non-template VM: start, shutdown (graceful), stop (force kill), reboot, reset (hard reset), suspend, or resume. NEVER call this on a template VM (template=true) — templates must be cloned first via clone_vm.',
         parameters: {
           type: 'object',
           properties: {
@@ -790,6 +790,7 @@ export async function executeTool(
       return data.map((vm) => ({
         vmid: vm.vmid,
         name: vm.name ?? `vm-${vm.vmid}`,
+        node,
         status: vm.status,
         template: vm.template === 1 || vm.template === true,
         cpu_percent: vm.status === 'running' ? `${((vm.cpu as number ?? 0) * 100).toFixed(2)}%` : 'off',
@@ -844,6 +845,7 @@ export async function executeTool(
       return data.map((ct) => ({
         vmid: ct.vmid,
         name: ct.name ?? `ct-${ct.vmid}`,
+        node,
         status: ct.status,
         cpu_percent: ct.status === 'running' ? `${((ct.cpu as number ?? 0) * 100).toFixed(2)}%` : 'off',
         memory: ct.status === 'running'
@@ -962,21 +964,32 @@ export async function executeTool(
 
     case 'wait_for_task': {
       const { node, task_id } = args as { node: string; task_id: string }
-      const deadline = Date.now() + 50_000
+      // Extract the actual node from the UPID so a wrong caller-supplied node doesn't silently skip checks.
+      // UPID format: UPID:{node}:{pid_hex}:{pstart_hex}:{starttime_hex}:{type}:{id}:{user}:
+      const upidParts = task_id.split(':')
+      const taskNode = (upidParts[0] === 'UPID' && upidParts[1] && /^[a-zA-Z0-9_-]+$/.test(upidParts[1]))
+        ? upidParts[1]
+        : node
+      const deadline = Date.now() + 120_000
       while (Date.now() < deadline) {
-        await new Promise(r => setTimeout(r, 5_000))
+        await new Promise(r => setTimeout(r, 10_000))
         try {
-          const status = await pveGet(base, proxmoxToken, `/nodes/${node}/tasks/${encodeURIComponent(task_id)}/status`) as Record<string, unknown>
+          const status = await pveGet(base, proxmoxToken, `/nodes/${taskNode}/tasks/${encodeURIComponent(task_id)}/status`) as Record<string, unknown>
           if (status.status === 'stopped') {
             const exit = status.exitstatus as string
             if (exit === 'OK') return { status: 'completed', message: 'Task completed successfully' }
             throw new Error(`Task failed: ${exit}`)
           }
         } catch (err) {
-          if (err instanceof Error && err.message.startsWith('Task failed')) throw err
+          if (err instanceof Error) {
+            // Re-throw task failures and non-transient API errors (4xx) immediately
+            if (err.message.startsWith('Task failed')) throw err
+            if (/Proxmox API [45]\d\d/.test(err.message)) throw err
+          }
+          // Transient network errors — keep polling until deadline
         }
       }
-      return { status: 'still_running', message: 'Task still running after 50s — disk may be large. Proceed with cloud-init config but do NOT start the VM yet.' }
+      throw new Error('Task did not complete within 120s. The Proxmox task is still running. Check the Proxmox task log — the operation may finish on its own. Do NOT call set_vm_cloudinit or vm_action until the clone task shows OK in the Proxmox UI.')
     }
 
     case 'clone_vm': {
@@ -1209,8 +1222,8 @@ export async function executeTool(
 // Sending fewer tools = fewer input tokens on every LLM step.
 
 const TOOL_GROUPS: Record<string, Set<string>> = {
-  provision:     new Set(['get_next_vmid','wait_for_task','clone_vm','set_vm_cloudinit','resize_vm_disk','vm_action','get_vm_ip','list_vms','list_nodes','get_cluster_resources']),
-  lxc_provision: new Set(['get_next_vmid','wait_for_task','create_container','container_action','list_nodes','list_storage','list_storage_content']),
+  provision:     new Set(['get_next_vmid','wait_for_task','clone_vm','set_vm_cloudinit','update_vm_config','resize_vm_disk','vm_action','get_vm_ip','list_vms','list_nodes','get_cluster_resources','get_vm_config']),
+  lxc_provision: new Set(['get_next_vmid','wait_for_task','create_container','container_action','list_nodes','list_storage','list_storage_content','update_container_config']),
   power:         new Set(['list_vms','list_containers','get_vm_status','vm_action','delete_vm','update_vm_config','container_action','delete_container','update_container_config','list_nodes']),
   snapshot:      new Set(['list_vms','list_vm_snapshots','create_vm_snapshot','rollback_vm_snapshot','delete_vm_snapshot','list_nodes','list_containers','list_container_snapshots','create_container_snapshot','rollback_container_snapshot','delete_container_snapshot']),
   lxc:           new Set(['list_nodes','list_containers','get_container_status','get_container_config','container_action','delete_container','list_container_snapshots','update_container_config']),
@@ -1224,17 +1237,17 @@ export function getToolsForTask(task: string): ToolDefinition[] {
   const all = getToolDefinitions()
   let group: Set<string> | null = null
 
-  if (/\b(creat|provision|spin.?up|deploy|new)\b.{0,30}\bvm\b|\bvm\b.{0,30}\b(creat|provision|new)\b/i.test(task))
+  if (/\b(creat[a-z]*|provision[a-z]*|spin.?up|deploy[a-z]*|new)\b.{0,30}\b(vm|server|machine)\b|\b(vm|server|machine)\b.{0,30}\b(creat[a-z]*|provision[a-z]*|new)\b/i.test(task))
     group = TOOL_GROUPS.provision
-  else if (/\b(creat|provision|spin.?up|deploy|new)\b.{0,30}\b(lxc|container)\b|\b(lxc|container)\b.{0,30}\b(creat|provision|new)\b/i.test(task))
+  else if (/\b(creat[a-z]*|provision[a-z]*|spin.?up|deploy[a-z]*|new)\b.{0,30}\b(lxc|container)\b|\b(lxc|container)\b.{0,30}\b(creat[a-z]*|provision[a-z]*|new)\b/i.test(task))
     group = TOOL_GROUPS.lxc_provision
   else if (/\bsnapshot\b|\brollback\b|\brestore\b/i.test(task))
     group = TOOL_GROUPS.snapshot
-  else if (/\b(delete|destroy|remove|wipe)\b.{0,30}\b(vm|machine|container|lxc)\b|\b(vm|machine|container|lxc)\b.{0,30}\b(delete|destroy|remove)\b/i.test(task))
+  else if (/\b(delete|destroy|remove|wipe)\b.{0,30}\b(vm|server|machine|container|lxc)\b|\b(vm|server|machine|container|lxc)\b.{0,30}\b(delete|destroy|remove)\b/i.test(task))
     group = TOOL_GROUPS.power
-  else if (/\b(update|change|set|resize|rename|modify)\b.{0,30}\b(vm|machine|container|lxc)\b.{0,40}\b(cpu|core|mem|ram|name|hostname|tag|desc)\b|\b(cpu|core|mem|ram|name|hostname|tag|desc)\b.{0,40}\b(vm|machine|container|lxc)\b/i.test(task))
+  else if (/\b(update|change|set|resize|rename|modify)\b.{0,30}\b(vm|server|machine|container|lxc)\b.{0,40}\b(cpu|core|mem|ram|name|hostname|tag|desc)\b|\b(cpu|core|mem|ram|name|hostname|tag|desc)\b.{0,40}\b(vm|server|machine|container|lxc)\b/i.test(task))
     group = TOOL_GROUPS.power
-  else if (/\b(start|stop|reboot|shutdown|reset|suspend|resume|restart)\b.{0,20}\b(vm|machine|container)\b|\b(vm|machine|container)\b.{0,20}\b(start|stop|reboot|shutdown)\b/i.test(task))
+  else if (/\b(start|stop|reboot|shutdown|reset|suspend|resume|restart)\b.{0,20}\b(vm|server|machine|container)\b|\b(vm|server|machine|container)\b.{0,20}\b(start|stop|reboot|shutdown)\b/i.test(task))
     group = TOOL_GROUPS.power
   else if (/\blxc\b|\bcontainer\b(?!.*docker)/i.test(task))
     group = TOOL_GROUPS.lxc

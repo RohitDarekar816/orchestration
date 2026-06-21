@@ -129,7 +129,7 @@ export default {
 
     // Pre-generate a strong random password so the model doesn't invent a weak one
     const vmPassword = generateVmPassword()
-    const isVmCreation = /\b(creat|provision|spin.?up|make|new)\b.*\b(vm|container|lxc)\b|\b(vm|container|lxc)\b.*\b(creat|provision)/i.test(task)
+    const isVmCreation = /\b(creat[a-z]*|provision[a-z]*|spin.?up|make|new)\b.*\b(vm|server|machine|container|lxc)\b|\b(vm|server|machine|container|lxc)\b.*\b(creat[a-z]*|provision[a-z]*)/i.test(task)
     const passwordHint = isVmCreation
       ? ` When creating a VM and setting cloud-init credentials, use exactly this pre-generated password: "${vmPassword}"`
       : ''
@@ -154,29 +154,34 @@ Rules:
 - For container details: use get_container_config for configuration; list_container_snapshots for snapshots.
 - Report memory and disk in human-readable units (GB/TB). Report CPU as percentage. Report uptime in days/hours/minutes format.
 - If a tool returns an error, report it exactly — do not fabricate.
+- When the user says "create a server", "new server", "spin up a server", or "provision a server" — treat it as creating a QEMU/KVM VM, NOT an LXC container. Follow the VM Provisioning steps below. Only follow the LXC Container Provisioning steps when the user explicitly says "container", "LXC", or "CT".
 
 VM Provisioning (create new VM from cloud-init template):
 1. Call get_next_vmid to get the next free VM ID.
-2. Call list_vms (node=<default node>) to find template VMs. Templates have template=true in the results. Look for Ubuntu templates by name (e.g. "ubuntu-template", "ubuntu-cloud", "ubuntu-2204"). If list_vms returns no templates, also try get_cluster_resources(type="vm") which covers all nodes. NEVER guess or assume a template VMID. If you find no VMs with template=true, STOP and respond: "No cloud-init templates found on this Proxmox cluster. Please create an Ubuntu cloud-init template first and let me know its VMID."
-3. Call clone_vm using the template VMID found in step 2.
-4. IMMEDIATELY call wait_for_task with the task_id returned by clone_vm. Do NOT skip this — starting or configuring a VM before the clone finishes causes a lock error.
-5. Call set_vm_cloudinit: set ciuser="ubuntu", use the pre-generated password from your instructions, set ipconfig0="ip=dhcp" unless user specified a static IP.
-6. Optionally call resize_vm_disk if user requested a specific disk size (default template disk is usually 2-10GB). Default to "+18G" if not specified.
-7. Call vm_action with action="start" to boot the VM.
-8. Call get_vm_ip — the tool automatically waits up to 90s for the QEMU guest agent to respond after boot. If it returns primary_ip=null, the VM is still running; the user should check their router's DHCP client list or run 'ip addr' in the VM console.
-9. Report back: VM ID, VM name, IP address (or "check router DHCP" if not available), username, password — clearly formatted for the user to save.
+2. Find the template: call get_cluster_resources(type="vm") — this returns all VMs across all nodes, each with a node field. Templates have template=true. Note the template's VMID AND its node field. NEVER guess or assume a template VMID or node. If you find no VMs with template=true, STOP and respond: "No cloud-init templates found on this Proxmox cluster. Please create an Ubuntu cloud-init template first."
+3. Call clone_vm with node=<THE NODE WHERE THE TEMPLATE WAS FOUND> (the node field from the template result in step 2 — NOT the default_node). Use source_vmid=<template vmid>, new_vmid=<from step 1>.
+   CRITICAL: The clone_vm node MUST be the exact node where the template lives. Passing the wrong node causes "Configuration file does not exist" in Proxmox.
+4. IMMEDIATELY call wait_for_task with the task_id returned by clone_vm AND node=<same template node>. Do NOT skip this — starting or configuring a VM before the clone finishes causes a lock error. If wait_for_task throws an error, STOP and report the error.
+5. Call set_vm_cloudinit with node=<same template node>, vmid=<new_vmid>: set ciuser="ubuntu", use the pre-generated password from your instructions, set ipconfig0="ip=dhcp" unless user specified a static IP.
+6. If the user specified RAM or CPU cores, call update_vm_config with node=<same template node>, vmid=<new_vmid>, memory=<MB> (1GiB=1024, 2GiB=2048, 4GiB=4096) and/or cores=<number>. The clone_vm API does not set RAM/CPU — this is the only way to do it.
+7. Optionally call resize_vm_disk with node=<same template node>, vmid=<new_vmid> if user requested a specific disk size. Default to "+18G" if not specified. Ubuntu cloud images use disk slot "scsi0" — use that unless get_vm_config shows a different slot.
+8. Call vm_action with node=<same template node>, vmid=<new_vmid>, action="start" to boot the VM.
+9. Call get_vm_ip with node=<same template node>, vmid=<new_vmid>. The tool waits up to 90s for the QEMU guest agent.
+10. Report back: VM ID, VM name, node, IP address (or "check router DHCP"), username, password, RAM, CPU — clearly formatted.
+- All steps 3–9 use the same node (the template's node). Never switch to the default_node mid-flow.
 - Always generate a strong random password (never use simple passwords like "ubuntu123").
 - If user provides an SSH public key, pass it as sshkeys (URL-encoded).
-- If user does not specify RAM/CPU, note those are set at clone time from the template.
+- If user does not specify RAM/CPU, the VM keeps the template defaults — state this in the final report.
 - If get_vm_ip returns null, do NOT call it again — just report the VM details and tell the user to check their router's DHCP table or run 'ip addr' in the Proxmox console.
 
 LXC Container Provisioning (create new container):
 1. Call get_next_vmid to get the next free container ID.
-2. Call list_storage_content(node=<default node>, storage=<storage>, content="vztmpl") to find available OS templates. Pick the most appropriate one for the user's request (e.g. ubuntu-22.04 for Ubuntu). If no templates are found, STOP and say: "No LXC OS templates found on this Proxmox cluster. Download one in Proxmox → Node → local → CT Templates."
-3. Call create_container using the template path, next vmid, user-supplied hostname, and pre-generated password. Default storage to "local-lvm", rootfs_size to "8", memory to "512", ip to "dhcp".
-4. Call wait_for_task with the returned task_id before starting.
-5. Call container_action with action="start" to boot the container.
-6. Report back: Container ID, hostname, IP config, username "root", password.
+2. Call list_storage(node=<default node>) to enumerate available storage pools. Identify a pool that supports "vztmpl" content (type "dir" or "zfspool" usually does; "local" almost always does).
+3. Call list_storage_content(node=<default node>, storage=<storage from step 2>, content="vztmpl") to find available OS templates. Pick the most appropriate one for the user's request (e.g. ubuntu-22.04 for Ubuntu). If no templates are found, STOP and say: "No LXC OS templates found on this Proxmox cluster. Download one in Proxmox → Node → local → CT Templates."
+4. Call create_container using the template path (volid), next vmid, user-supplied hostname, and pre-generated password. Use the storage pool from step 2 for rootfs (prefer "local-lvm" if available, else the pool from step 2). Default rootfs_size to "8", memory to "512", ip to "dhcp".
+5. Call wait_for_task with the returned task_id before starting.
+6. Call container_action with action="start" to boot the container.
+7. Report back: Container ID, hostname, IP config, username "root", password.
 
 VM/Container Config Updates:
 - For "change VM cpu/memory/name/tags" or "resize VM cpu/ram": call list_vms to confirm the vmid, then call update_vm_config with only the fields to change.
@@ -202,8 +207,8 @@ Container Snapshot Operations:
     const sessionId = `ses_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
 
     // Max tool-call rounds before forcing a text-only wrap-up call
-    // Provision flow: list_vms(templates) → get_next_vmid → clone_vm → wait_for_task → set_vm_cloudinit → resize → start → get_vm_ip = 8 steps
-    const MAX_TOOL_STEPS = 9
+    // Provision flow: list_vms → get_next_vmid → clone_vm → wait_for_task → set_vm_cloudinit → update_vm_config → resize → start → get_vm_ip = 9 steps
+    const MAX_TOOL_STEPS = 12
 
     try {
       for (let step = 0; step <= MAX_TOOL_STEPS; step++) {

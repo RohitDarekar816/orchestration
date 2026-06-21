@@ -10,7 +10,7 @@ import {
   launchAndWait,
 } from '../lib/oz_client'
 
-import { formatDockerOutput } from './docker_logs'
+import { formatProxmoxOutput } from './docker_logs'
 
 export const run: ActionFunction = async function (params) {
   const settings = new Settings()
@@ -64,7 +64,7 @@ export const run: ActionFunction = async function (params) {
       key: 'proxmox_result',
       data: {
         server: ep.name,
-        logs: formatDockerOutput(output, ep.name, 'proxmox'),
+        logs: formatProxmoxOutput(output, ep.name),
         agent_id: String(agentId),
         status,
       },

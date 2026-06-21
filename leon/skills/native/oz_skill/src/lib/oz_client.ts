@@ -103,7 +103,7 @@ export function extractOutput(
   const rawLines = stdoutLines.length > 0
     ? stdoutLines
     : logs
-        .filter((l) => l.stream === 'stderr')
+        .filter((l) => l.stream === 'stderr' || l.stream === 'error')
         .map((l) => l.content.replace(ANSI_RE, '').trim())
         .filter((l) => l.length > 0 && !NOISE_PATTERNS.some((p) => p.test(l)))
 
